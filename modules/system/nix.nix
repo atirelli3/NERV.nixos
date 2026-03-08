@@ -15,7 +15,7 @@
   system.autoUpgrade = {
     enable = true;
     allowReboot = false;
-    flake = "/etc/nerv#nixos-base";
+    flake = "/etc/nixos#host";
     dates = "daily";
   };
 

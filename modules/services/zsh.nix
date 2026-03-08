@@ -7,7 +7,7 @@
 # Note     : syntaxHighlighting.enable is set false in the NixOS wrapper and sourced manually in
 #            interactiveShellInit to enforce load order:
 #            autosuggestions -> syntax-highlighting -> history-substring-search.
-#            NixOS aliases target /etc/nerv#nixos-base.
+#            NixOS aliases target /etc/nixos#host.
 
 { config, lib, pkgs, ... }:
 
@@ -82,10 +82,10 @@ in {
         gsp  = "git stash pop";
 
         # Nix / NixOS
-        nrs  = "sudo nixos-rebuild switch --flake /etc/nerv#nixos-base";
-        nrb  = "sudo nixos-rebuild boot   --flake /etc/nerv#nixos-base";
-        nrt  = "sudo nixos-rebuild test   --flake /etc/nerv#nixos-base";
-        nfu  = "sudo nix flake update /etc/nerv";
+        nrs  = "sudo nixos-rebuild switch --flake /etc/nixos#host";
+        nrb  = "sudo nixos-rebuild boot   --flake /etc/nixos#host";
+        nrt  = "sudo nixos-rebuild test   --flake /etc/nixos#host";
+        nfu  = "sudo nix flake update /etc/nixos";
         ngc  = "sudo nix-collect-garbage -d";
         nso  = "sudo nix store optimise";
         nsh  = "nix shell nixpkgs#";
