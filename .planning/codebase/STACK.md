@@ -1,127 +1,125 @@
 # Technology Stack
 
-**Analysis Date:** 2026-03-06
+**Analysis Date:** 2026-03-08
 
 ## Languages
 
 **Primary:**
-- Nix (DSL) - All system configuration, module definitions, flake inputs/outputs
+- Nix (language) - All configuration, module logic, and build expressions. Used across every `.nix` file in the repository.
 
 **Secondary:**
-- Bash - Inline systemd service scripts (secureboot enrollment, AIDE checks, TPM2 enrollment)
+- Bash - Inline systemd service scripts (e.g., `secureboot-enroll-keys`, `secureboot-enroll-tpm2` in `modules/system/secureboot.nix`) and the `luks-cryptenroll` helper script.
 
 ## Runtime
 
 **Environment:**
-- NixOS (Linux) - Target OS for all configurations
-- Target architecture: `x86_64-linux`
-- NixOS state version: `25.11`
+- NixOS (Linux) - x86_64-linux only. Declared in `flake.nix` under all three `nixosConfigurations` entries (`host`, `server`, `vm`).
 
 **Package Manager:**
-- Nix (Flakes mode) - Dependency pinning via `flake.lock`
-- Legacy channels: disabled (`nix.channel.enable = false` in `modules/nix.nix`)
-- Experimental features enabled: `nix-command`, `flakes`
+- Nix (flakes mode) - Channels are disabled (`nix.channel.enable = false` in `modules/system/nix.nix`). Flakes handle all input pinning.
+- Lockfile: `flake.lock` (present — managed by Nix flake tooling)
 
-## Frameworks / Configuration System
+## Frameworks
 
 **Core:**
-- NixOS module system - Declarative OS configuration via `{ config, lib, pkgs, ... }:` module pattern
-- Nix Flakes - Reproducible, pinned dependency management (`base/flake.nix`, `.template/flake.nix`, `.template/flake2.nix`)
-- Disko - Declarative disk partitioning (`base/disko-configuration.nix`, `server/disko-configuration.nix`)
+- NixOS Module System - The entire codebase is a NixOS module library. Every `.nix` file in `modules/` and `home/` is a NixOS module exposing `options.nerv.*` and `config` output.
 
-**Boot:**
-- Lanzaboote `github:nix-community/lanzaboote` (pinned to `v0.4.1` in `.template/flake2.nix`, unpinned in `base/flake.nix`) - UEFI Secure Boot bootloader replacing systemd-boot
-- systemd-initrd - Required for LVM-on-LUKS and crypttab integration (`boot.initrd.systemd.enable = true`)
+**Disk Layout:**
+- disko `v1.13.0` (`github:nix-community/disko`) - Declarative GPT/EFI/LUKS/LVM disk layout. Configuration in `hosts/disko-configuration.nix`.
+
+**Home Management:**
+- home-manager (`github:nix-community/home-manager`) - Wired as a NixOS module via `home/default.nix`. Tracks `nixpkgs` (pinned via `inputs.nixpkgs.follows`).
+
+**Secure Boot:**
+- lanzaboote (`github:nix-community/lanzaboote`) - UEFI Secure Boot bootloader. Optional — activated only when `nerv.secureboot.enable = true`. Replaces systemd-boot at runtime.
 
 **Impermanence:**
-- `github:nix-community/impermanence` - tmpfs root with selective `/persist` bind-mounts (referenced in `.template/flake.nix`, implemented in `.template/configuration.nix`)
+- impermanence (`github:nix-community/impermanence`) - NixOS module for `environment.persistence`. Required only in `server` profile (`mode = "full"`). Desktop/VM use the built-in tmpfs approach from `modules/system/impermanence.nix`.
 
-## Key System Packages
+## Key Dependencies (Flake Inputs)
 
-**Security Tools:**
-- `sbctl` - Secure Boot key management (enroll, sign, status)
-- `tpm2-tss` - TPM2 Software Stack (LUKS auto-unlock via TPM2)
+| Input | Source | Version Pin | Purpose |
+|---|---|---|---|
+| `nixpkgs` | `github:NixOS/nixpkgs/nixos-unstable` | flake.lock | All packages and NixOS modules |
+| `lanzaboote` | `github:nix-community/lanzaboote` | flake.lock | Secure Boot bootloader |
+| `home-manager` | `github:nix-community/home-manager` | flake.lock | User environment management |
+| `disko` | `github:nix-community/disko/v1.13.0` | `v1.13.0` tag | Declarative disk partitioning |
+| `impermanence` | `github:nix-community/impermanence` | flake.lock | Server-mode root-as-tmpfs |
+
+All community inputs except `impermanence` declare `inputs.nixpkgs.follows = "nixpkgs"` to prevent duplicate nixpkgs instances.
+
+## System Packages (Unconditional)
+
+Declared in `modules/system/packages.nix` — present on all profiles:
+- `git` - Version control; required for `nix flake` operations
+- `fastfetch` - System info display with NERV ASCII logo
+
+## System Packages (Conditional — security.nix)
+
+Always enabled (unconditional security module):
+- `lynis` - System hardening auditor
+- `aide` - File integrity monitor (AIDE)
+
+## System Packages (Conditional — secureboot.nix)
+
+Only when `nerv.secureboot.enable = true`:
+- `sbctl` - Secure Boot key management
+- `tpm2-tss` - TPM2 Software Stack library
 - `tpm2-tools` - TPM2 command-line utilities
-- `lynis` - System hardening auditor (`modules/security.nix`)
-- `aide` - File integrity monitor (`modules/security.nix`)
-- ClamAV (`services.clamav`) - Antivirus daemon + definition updater (`modules/security.nix`)
+- `luks-cryptenroll` - Custom helper script (inline `pkgs.writeTextFile`)
 
-**Shell / CLI:**
-- Zsh with `zsh-syntax-highlighting`, `zsh-history-substring-search`, `zsh-autosuggestions` (`modules/zsh.nix`)
-- `starship` - Cross-shell prompt (`modules/zsh.nix`)
-- `eza` - `ls` replacement (`modules/zsh.nix`)
-- `fzf` - Fuzzy finder (`modules/zsh.nix`)
-- Nerd Fonts: `caskaydia-cove`, `jetbrains-mono` (`modules/zsh.nix`)
+## System Packages (Conditional — pipewire.nix)
 
-**Audio:**
-- PipeWire with ALSA, PulseAudio compat, WirePlumber session manager (`modules/pipewire.nix`)
-- `pwvucontrol`, `helvum` - GUI audio management (`modules/pipewire.nix`)
-- `bluez` - Bluetooth stack with OBEX and MPRIS proxy (`modules/bluetooth.nix`)
-- `blueman` - Bluetooth GUI manager (`modules/bluetooth.nix`)
+Only when `nerv.audio.enable = true`:
+- `pwvucontrol` - Per-app volume control (GTK4/libadwaita)
+- `helvum` - PipeWire patchbay
 
-**Printing:**
-- CUPS (`services.printing`) with `gutenprint` drivers (`modules/printing.nix`)
-- Avahi mDNS for network printer discovery (`modules/printing.nix`, `modules/pipewire.nix`)
+## System Packages (Conditional — zsh.nix)
 
-**Firmware:**
-- `fwupd` - LVFS firmware update service (`modules/hardware.nix`)
-- AMD CPU microcode (`hardware.cpu.amd.updateMicrocode = true`) (`modules/hardware.nix`)
-- Redistributable + all firmware blobs enabled (`modules/hardware.nix`)
-
-**Terminal font packages:**
-- `terminus_font` - TTY PSF font (`base/configuration.nix`)
+Only when `nerv.zsh.enable = true`:
+- `eza` - Modern `ls` replacement
+- `fzf` - Fuzzy finder (shell integration via inline source)
+- `zsh-syntax-highlighting` - Sourced manually in `interactiveShellInit`
+- `zsh-history-substring-search` - Sourced manually in `interactiveShellInit`
 
 ## Kernel
 
-**Variant:**
-- `base/configuration.nix`: `pkgs.linuxPackages_latest` (overridden by `modules/kernel.nix`)
-- `modules/kernel.nix`: `pkgs.linuxPackages_zen` (desktop-optimised, low latency)
-- Alternative noted in comments: `linuxPackages_hardened`
-
-**Kernel Parameters (security hardening):**
-- IOMMU: `amd_iommu=on`, `iommu=pt`
-- Memory: `slab_nomerge`, `init_on_alloc=1`, `init_on_free=1`, `page_alloc.shuffle=1`, `randomize_kstack_offset=on`
-- CPU mitigations: `pti=on`, `tsx=off`
-- Surface reduction: `vsyscall=none`, `debugfs=off`
-
-**Blacklisted modules:**
-- Filesystems: `cramfs`, `freevxfs`, `jffs2`, `hfs`, `hfsplus`, `udf`
-- Network protocols: `dccp`, `sctp`, `rds`, `tipc`
+- **Default:** `pkgs.linuxPackages_zen` (set via `lib.mkForce` in `modules/system/kernel.nix`, overrides the `linuxPackages_latest` fallback in `modules/system/boot.nix`)
+- Zen kernel is optimized for desktop responsiveness / low latency
+- Blacklisted modules: `cramfs freevxfs jffs2 hfs hfsplus udf dccp sctp rds tipc`
 
 ## Configuration
 
-**Build System:**
-- Flake-based: `base/flake.nix` is the active flake; `.template/` directory holds reference/template variants
-- NixOS rebuild command: `sudo nixos-rebuild switch --flake /etc/nixos#nixos`
-- Flake update command: `sudo nix flake update /etc/nixos`
+**Nix settings (modules/system/nix.nix):**
+- `experimental-features = [ "nix-command" "flakes" ]`
+- `allowed-users = [ "@wheel" ]`
+- `trusted-users = [ "root" ]`
+- `auto-optimise-store = true`
+- `keep-outputs = true`, `keep-derivations = true`
+- GC: automatic weekly, delete older than 20 days
+- Store optimise: automatic weekly
+- `nixpkgs.config.allowUnfree = true` (required for firmware blobs)
 
 **Auto-upgrade:**
-- Daily pulls from flake at `/etc/nixos#nixos` (`modules/nix.nix`)
-- Manual reboot required (`allowReboot = false`)
+- Daily pull from `/etc/nixos#host` flake reference
+- `allowReboot = false` — manual reboot required
 
-**Nix store maintenance:**
-- Garbage collection: weekly, deletes store paths older than 20 days
-- Store optimisation: weekly dedup pass + incremental `auto-optimise-store`
-
-**Unfree packages:**
-- Allowed (`nixpkgs.config.allowUnfree = true` in `modules/nix.nix`)
-
-## Nixpkgs Channel
-
-**Source:** `github:NixOS/nixpkgs/nixos-unstable` (rolling unstable channel)
+**Boot config (modules/system/boot.nix):**
+- initrd: systemd-based, LVM + LUKS
+- LUKS device label: `NIXLUKS` (must stay in sync with `disko-configuration.nix` and `secureboot.nix`)
+- Bootloader: systemd-boot (EFI), superseded by lanzaboote when secureboot enabled
 
 ## Platform Requirements
 
 **Development:**
-- Nix with flakes enabled
-- `x86_64-linux` target
+- NixOS or any Linux system with Nix flakes enabled
+- `nixos-rebuild --impure` required when `nerv.home.enable = true` (reads `~/home.nix` outside flake boundary)
 
-**Production:**
-- Bare-metal or VM with UEFI firmware supporting Secure Boot Setup Mode
-- AMD CPU (microcode and IOMMU settings are AMD-specific)
-- TPM2 chip (for LUKS auto-unlock sealed to Secure Boot state)
-- SSD recommended (TRIM support configured throughout)
+**Production / Deployment:**
+- x86_64-linux only (all three `nixosConfigurations` are `system = "x86_64-linux"`)
+- Target disk must be identified and set in `hosts/configuration.nix` (`disko.devices.disk.main.device`)
+- All `PLACEHOLDER` values in `hosts/configuration.nix` must be replaced before `nixos-rebuild`
 
 ---
 
-*Stack analysis: 2026-03-06*
+*Stack analysis: 2026-03-08*

@@ -1,228 +1,261 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-03-06
+**Analysis Date:** 2026-03-08
 
 ## Language
 
-This is a pure **Nix** configuration codebase. All files use the `.nix` extension and the Nix expression language. There are no TypeScript, Python, or other general-purpose languages. Conventions below are Nix-specific.
+This is a pure Nix codebase — all source files use the Nix expression language (`.nix`). There is no TypeScript, Python, or other general-purpose language. Conventions apply to Nix idioms and NixOS module authoring.
 
-## File Header Pattern
+## File Header Comments
 
-Every module file opens with the standard NixOS module argument destructure, followed by a blank line, then the attribute set body:
+Every `.nix` file begins with a structured block comment. This is mandatory — treat it as a file-level docstring.
 
+**Pattern (service modules with options):**
 ```nix
-{ config, lib, pkgs, ... }:
-
-{
-  # content
-}
+# modules/services/openssh.nix
+#
+# Purpose  : SSH daemon hardened with endlessh tarpit and fail2ban.
+# Options  : nerv.openssh.enable, nerv.openssh.port, nerv.openssh.tarpitPort, ...
+# Defaults : enable = false; port = 2222; tarpitPort = 22; ...
+# Override : lib.mkForce on any services.openssh.* or services.fail2ban.* setting.
+# Note     : Port 22 is reserved for the endlessh tarpit. Connect with ssh -p <port>.
 ```
 
-Files that require `let` bindings place them between the argument line and the opening `{`:
-
+**Pattern (opaque modules with no options):**
 ```nix
-{ config, lib, pkgs, ... }:
-
-let
-  myDerivation = pkgs.writeTextFile { ... };
-in
-
-{
-  # content
-}
+# modules/system/kernel.nix
+#
+# Purpose : Kernel selection and generic hardening parameters.
+# Options : None — fully opaque. Use lib.mkForce to override any setting.
+# Note    : CPU-specific IOMMU params live in hardware.nix ...
 ```
 
-See `modules/secureboot.nix` and `.template/secureboot-configuration.nix` for examples.
+**Pattern (aggregator default.nix):**
+```nix
+# modules/system/default.nix
+#
+# Purpose  : Aggregates all nerv system modules.
+# Modules  : identity, hardware, kernel, security, nix, packages, boot, impermanence, secureboot
+# Note     : secureboot.nix must be last — it applies lib.mkForce false on systemd-boot ...
+```
 
-Flake files (`base/flake.nix`, `.template/flake.nix`, `.template/flake2.nix`) use the raw attribute set form without module arguments, as required by the flake schema.
+**Fields used (aligned with spaces, not tabs):**
+- `Purpose` — one-line description of the module's responsibility
+- `Options` — list of all `nerv.*` options declared (or "None")
+- `Defaults` — default values for key options
+- `Override` — how a consumer can escape hardcoded settings
+- `Note` — cross-cutting concerns, import order requirements, caveats
 
 ## Naming Patterns
 
 **Files:**
-- Module files: `kebab-case.nix` — e.g., `openssh.nix`, `secureboot.nix`, `pipewire.nix`
-- Configuration files: `configuration.nix`, `disko-configuration.nix` (fixed names per NixOS convention)
-- Flake entry points: `flake.nix`
+- `kebab-case.nix` — all module files use lowercase kebab-case: `openssh.nix`, `disko-configuration.nix`, `hardware-configuration.nix`
+- `default.nix` — aggregator files at each directory level import their siblings
 
-**NixOS option paths:** Follow upstream NixOS naming exactly — `services.openssh`, `boot.lanzaboote`, `security.apparmor`. No custom naming layer exists.
+**NixOS options namespace:**
+- All custom options live under `nerv.*`: `nerv.openssh.enable`, `nerv.hardware.cpu`, `nerv.impermanence.mode`
+- Sub-namespace for feature-specific options: `nerv.locale.timeZone`, `nerv.impermanence.persistPath`
+- Boolean toggles always use `lib.mkEnableOption`: `nerv.openssh.enable`, `nerv.bluetooth.enable`
 
-**Attribute keys in sets:** Use camelCase for NixOS-standard attributes (`allowDiscards`, `extraFormatArgs`, `powerOnBoot`). Use SCREAMING_SNAKE_CASE for disk labels as they appear in filesystem identifiers: `NIXBOOT`, `NIXROOT`, `NIXLUKS`, `NIXSWAP`, `NIXSTORE`, `NIXPERSIST`, `NIXHOME`.
+**Local config alias:**
+- Always bind `config.nerv.<feature>` to a local `cfg` binding at the top of the `let` block:
+  ```nix
+  let
+    cfg = config.nerv.openssh;
+  in { ... }
+  ```
+- Exception: `modules/system/identity.nix` uses `cfg = config.nerv` when accessing multiple top-level nerv attrs.
 
-**Let-bound variables:** camelCase — `luksDevice01`, `luks-cryptenroll`.
+**Nix let bindings:**
+- `camelCase` for computed local bindings: `extraDirFileSystems`, `userFileSystems`, `userTmpfilesRules`, `luksDevice01`
 
-**systemd service names:** `kebab-case` strings — `"secureboot-enroll-keys"`, `"aide-check"`.
+**Flake-level let bindings:**
+- `camelCase` for profile attrsets: `hostProfile`, `serverProfile`, `vmProfile`
 
-## Attribute Set Style
+## Module Structure Pattern
 
-**Prefer grouped attribute sets over flat dot-notation when multiple sub-keys are set:**
+Every service/system module follows this exact layout:
 
 ```nix
-# Preferred — grouped
-services.openssh = {
-  enable = true;
-  ports = [ 2222 ];
-  openFirewall = true;
-  settings = {
-    PasswordAuthentication = false;
-    PermitRootLogin = "no";
+# <path/to/file.nix>
+# <header comment block>
+
+{ config, lib, pkgs, ... }:
+
+let
+  cfg = config.nerv.<feature>;
+in {
+  options.nerv.<feature> = {
+    enable = lib.mkEnableOption "<description>";
+    <option> = lib.mkOption {
+      type        = lib.types.<type>;
+      default     = <value>;
+      description = "<description>";
+      example     = <value>;
+    };
   };
+
+  config = lib.mkIf cfg.enable {
+    <nixos settings>
+  };
+}
+```
+
+**Opaque modules** (no user-facing options, always-on) omit the `options` block and `let cfg` binding:
+```nix
+{ config, lib, pkgs, ... }:
+{
+  <nixos settings>
+}
+```
+
+**Multi-condition modules** use `lib.mkMerge` for multiple conditional blocks:
+```nix
+config = lib.mkMerge [
+  { <unconditional settings> }
+  (lib.mkIf (cfg.cpu == "amd") { <amd-specific> })
+  (lib.mkIf (cfg.cpu == "intel") { <intel-specific> })
+];
+```
+
+## Option Declarations
+
+**Standard option with all fields (align with spaces):**
+```nix
+port = lib.mkOption {
+  type        = lib.types.port;
+  default     = 2222;
+  description = "Port the SSH daemon listens on. ...";
+  example     = 2222;
 };
-
-# Avoid — flat repetition
-services.openssh.enable = true;
-services.openssh.ports = [ 2222 ];
 ```
 
-Exception: single-option settings use dot-notation inline — `services.avahi.nssmdns4 = true;` when only one key is set.
+- Field alignment: `type`, `default`, `description`, `example` — padded to align the `=` signs.
+- `description` is always a string (single or multi-line with `''`), never omitted.
+- `example` is always present unless the option uses `lib.mkEnableOption` (which provides its own).
+- Types use `lib.types.*` fully qualified: `lib.types.port`, `lib.types.listOf lib.types.str`, `lib.types.enum [ "amd" "intel" "other" ]`, `lib.types.attrsOf (lib.types.attrsOf lib.types.str)`.
 
-**Alignment:** Multi-key attribute sets within a block are visually aligned at the `=` sign when keys are short and related:
+## Assertions Pattern
+
+Use `assertions` inside `config` blocks to enforce invariants at build time:
 
 ```nix
-serviceConfig = {
-  Type            = "oneshot";
-  RemainAfterExit = true;
-  User            = "root";
+config = lib.mkIf cfg.enable {
+  assertions = [{
+    assertion = cfg.tarpitPort != cfg.port;
+    message   = "nerv.openssh.tarpitPort (${toString cfg.tarpitPort}) must differ from nerv.openssh.port (${toString cfg.port}).";
+  }];
+  ...
 };
 ```
 
-See `modules/security.nix` (lines 96–104) and `modules/secureboot.nix` (lines 60–64) for this pattern.
+- `assertion` holds the boolean expression that must be true.
+- `message` uses string interpolation to include actual values, giving actionable error output.
+- `lib.optional` is used when assertions are themselves conditional: `assertions = lib.optional config.nerv.secureboot.enable { ... };`
 
-## Comment Style
+## Inline Comments Style
 
-**Inline comments** use `#` at end of line with two spaces before `#`:
-
+**Inline comments on settings** (after `=`) use `#` with a single space, placed to the right:
 ```nix
-alsa.support32Bit = true;  # needed for 32-bit apps (e.g. Steam, Wine)
+alsa.support32Bit = true; # needed for 32-bit apps (e.g. Steam, Wine)
+pulse.enable = true;      # PulseAudio compatibility layer
 ```
 
-**Block comments** precede the option they describe. Short rationale goes on the line immediately before:
-
+**Section dividers in large attrsets** use `# ── Section ──...──`:
 ```nix
-# Prevent writing to the kernel image at runtime (blocks /dev/mem abuse).
-security.protectKernelImage = true;
+# ── Network ──────────────────────────────────────────────────────────────
 ```
 
-**Multi-line explanations** use consecutive `#` lines, never `/* */` block comments:
-
+**Explanatory comments** precede the setting they describe:
 ```nix
-# First-boot setup runs across two reboots.
-# PCR 7 measures the Secure Boot policy; enrolling keys changes it on the NEXT boot.
-# Binding LUKS to TPM2 in the same boot as key enrollment would capture the wrong
-# PCR 7 value, causing TPM2 to refuse auto-unlock.
+# Allows PipeWire to acquire realtime scheduling priority.
+security.rtkit.enable = true;
 ```
 
-**Section dividers** appear in monolithic `configuration.nix` templates only (not in dedicated module files). They use `# ===` banners with a label in caps:
-
+**Cross-reference comments** point to related files:
 ```nix
-# ============================================================
-# SECURITY
-# ============================================================
+# NIXLUKS label must stay in sync with disko-configuration.nix and secureboot.nix
 ```
 
-Dedicated module files (under `modules/`) do NOT use section banners — each file is already scoped to one concern.
+## Override Pattern
 
-**Commented-out code blocks** are used to provide opt-in examples or alternatives. They always include a note explaining when to uncomment:
+Every module documents its escape hatch. The convention is `lib.mkForce` at the consuming host flake level:
+
+- Opaque modules include `# Options : None — fully opaque. Use lib.mkForce to override any setting.`
+- Service modules include `# Override : lib.mkForce on any services.<name>.* setting.`
+- Where `lib.mkForce` is used internally (e.g., `secureboot.nix` forces `systemd-boot.enable = false`), the reason is always commented.
+
+## Aggregator Pattern (default.nix)
+
+Each directory has a `default.nix` that only contains an `imports` list — no logic:
 
 ```nix
-# Option A: inline the key directly
-#   users.users."myUser".openssh.authorizedKeys.keys = [
-#     "ssh-ed25519 AAAA... user@host"
-#   ];
+# modules/services/default.nix
 #
-# Option B: point to an authorized_keys file (e.g. ./ssh/authorized_keys)
+# Purpose  : Aggregates all nerv service modules.
+{ imports = [
+    ./openssh.nix
+    ./pipewire.nix
+    ./bluetooth.nix
+    ./printing.nix
+    ./zsh.nix
+  ];
+}
 ```
 
-See `modules/openssh.nix` (lines 18–32) and `modules/pipewire.nix` (line 15).
+Import order is significant when documented (see `modules/system/default.nix` — `secureboot.nix` must be last).
 
-## Indentation and Formatting
+## Profiles Pattern (flake.nix)
 
-- **2-space indentation** throughout all `.nix` files.
-- Closing braces `}`, `]`, `)` align with the opening statement's indentation level.
-- List items on separate lines when the list has more than 2 elements:
+Named configuration profiles are `let` bindings in `flake.nix` — plain attrsets of `nerv.*` option assignments. All options use explicit aligned assignment:
 
 ```nix
-modules = [
-  ./configuration.nix
-  lanzaboote.nixosModules.lanzaboote
-  ../modules/secureboot.nix
-];
+hostProfile = {
+  nerv.openssh.enable       = true;
+  nerv.audio.enable         = true;
+  nerv.bluetooth.enable     = true;
+  nerv.printing.enable      = true;
+  nerv.secureboot.enable    = false;
+  nerv.impermanence.enable  = true;
+  nerv.impermanence.mode    = "minimal";
+  nerv.zsh.enable           = true;
+  nerv.home.enable          = true;
+};
 ```
 
-- Short two-element lists may fit on one line:
+- All `enable` values are explicit (`true` or `false`), never omitted.
+- Attrset values are column-aligned using spaces.
+
+## Host Configuration (hosts/configuration.nix)
+
+Host-specific files declare only machine-specific values. All placeholder values use the string `"PLACEHOLDER"` (uppercase) to signal mandatory customization:
 
 ```nix
-extraGroups = [ "wheel" "networkmanager" ];
+nerv.hostname    = "PLACEHOLDER";   # e.g. "my-desktop"
+nerv.primaryUser = [ "PLACEHOLDER" ]; # e.g. [ "alice" ]
 ```
 
-## lib.mkForce Usage
+Comments on PLACEHOLDER lines include an inline example: `# e.g. "my-desktop"`.
 
-`lib.mkForce` is used explicitly when a module must override a value that another module sets (specifically for `fileSystems` overriding Disko-generated mounts, and for disabling `systemd-boot` when lanzaboote takes over):
+## lib Usage
 
-```nix
-# lib.mkForce overrides the Disko-generated mounts — keep labels in sync with disko-configuration.nix.
-fileSystems."/" = lib.mkForce { ... };
-boot.loader.systemd-boot.enable = lib.mkForce false;
-```
+- Prefer `lib.mkIf` over manual `if ... then ... else {}` in `config` blocks.
+- Use `lib.mkMerge` for multiple independent conditional blocks in one `config`.
+- Use `lib.mkDefault` for values the user should be able to override without `mkForce`.
+- Use `lib.mkForce` only when lower-priority declarations must be suppressed (e.g., disabling systemd-boot for lanzaboote).
+- `lib.optionalAttrs` for conditionally including attrset keys: `lib.optionalAttrs (cfg.allowUsers != []) { AllowUsers = ...; }`.
+- `lib.optional` for conditionally including list items.
+- `builtins.*` functions (e.g., `builtins.listToAttrs`, `builtins.map`) are used directly without `lib.*` prefix.
 
-Always accompany `lib.mkForce` with a comment explaining why the override is necessary. See `base/configuration.nix` (lines 13–24) and `modules/secureboot.nix` (line 30).
+## Formatting
 
-## with pkgs Pattern
-
-`with pkgs; [ ... ]` is used for `environment.systemPackages` and `fonts.packages` lists:
-
-```nix
-environment.systemPackages = with pkgs; [
-  lynis
-  aide
-];
-```
-
-Direct `pkgs.` prefixing is used in `path = [ pkgs.sbctl pkgs.systemd ]` and similar service `path` attributes, where clarity about exact packages is preferred.
-
-## Placeholder Conventions
-
-Unresolved site-specific values are marked with uppercase placeholder strings and a comment:
-
-```nix
-device = "/dev/DISK";  # replace with actual disk, e.g. "/dev/nvme0n1"
-size = "SIZE_RAM * 2"; # placeholder — replace with e.g. "16G" (2× RAM)
-AllowUsers = [ "myUser" ]; # replace with your actual username
-```
-
-See `base/disko-configuration.nix` and `modules/openssh.nix`.
-
-## Module Granularity
-
-Each file in `modules/` covers exactly one system concern:
-- `modules/openssh.nix` — SSH daemon, tarpit, fail2ban
-- `modules/security.nix` — kernel hardening, AppArmor, auditd, ClamAV, AIDE
-- `modules/kernel.nix` — kernel params, sysctl, blacklisted modules
-- `modules/secureboot.nix` — lanzaboote, TPM2, first-boot automation
-- `modules/pipewire.nix` — audio stack, AirPlay, latency tuning
-- `modules/bluetooth.nix` — Bluetooth, OBEX, MPRIS proxy
-- `modules/hardware.nix` — firmware, microcode, fwupd, fstrim
-- `modules/printing.nix` — CUPS, Avahi mDNS
-- `modules/nix.nix` — Nix daemon settings, GC, auto-upgrade
-- `modules/zsh.nix` — shell, aliases, Starship prompt, Nerd Fonts
-
-A module is included from a `flake.nix` by adding it to the `modules` list in `nixpkgs.lib.nixosSystem`. See `base/flake.nix` (lines 19–27).
-
-## Error Handling
-
-No runtime error handling constructs exist — this is a declarative configuration language. Idempotency and failure handling for imperative shell scripts inside `systemd.services.*.script` blocks uses guard files and conditional checks:
-
-```bash
-if [ -f /var/lib/secureboot-keys-enrolled ]; then
-  echo "secureboot [1/2]: already done, skipping"
-  exit 0
-fi
-```
-
-Shell scripts within `script` blocks use explicit `if !` guards before destructive operations (enrolling keys, running cryptenroll). See `modules/secureboot.nix` (lines 67–83, 101–130).
-
-## Language Mixing
-
-Some comments in `.template/` files appear in **Italian** (e.g., `.template/configuration.nix`). Files under `modules/` and `base/` use **English** comments exclusively. New module files should use English comments only.
+- No automated formatter detected (no `nixfmt`, `alejandra`, or `treefmt` config files present).
+- Indentation: 2 spaces throughout.
+- Attribute alignment: spaces used to align `=` signs within related groups of attributes.
+- Opening braces on the same line: `options.nerv.openssh = {`.
+- Closing braces on their own line at the matching indentation level.
+- Lists with one item per line when list has more than ~2 elements.
 
 ---
 
-*Convention analysis: 2026-03-06*
+*Convention analysis: 2026-03-08*
