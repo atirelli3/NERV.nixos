@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 5: Home Manager Skeleton** - Wire home-manager NixOS module and expose nerv.home.* options
 - [x] **Phase 6: Documentation Sweep** - Apply section-header style and disko warning to all files (completed 2026-03-07)
 - [x] **Phase 7: Flake Hardening, Disko Wiring, and Nyquist Validation** - Fix unused impermanence input, add explicit option declarations, wire disko as flake input, complete Nyquist validation for all phases (completed 2026-03-08)
-- [ ] **Phase 8: NERV.nixos Release & Multi-Profile Migration** - Delete dead flat modules, add full impermanence for server, define host/server/vm profiles in flake.nix, migrate to NERV.nixos repo, reset test repo to baseline
+- [x] **Phase 8: NERV.nixos Release & Multi-Profile Migration** - Delete dead flat modules, add full impermanence for server, define host/server/vm profiles in flake.nix, migrate to NERV.nixos repo, reset test repo to baseline (completed 2026-03-08)
 
 ## Phase Details
 
