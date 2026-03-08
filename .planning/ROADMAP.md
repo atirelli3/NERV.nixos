@@ -151,13 +151,13 @@ Plans:
   6. NERV.nixos repo at `git@github.com:atirelli3/NERV.nixos.git` has the complete refined structure: `/home`, `/hosts`, `/modules`, `flake.nix`, `.git`
   7. test-nerv.nixos HEAD is at commit `cab4126e8664a808eef482154a8500106ae22246`
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans executed
 
 Plans:
-- [ ] 08-01-PLAN.md — Delete 9 dead flat modules from modules/ root, verify nix flake check
-- [ ] 08-02-PLAN.md — Add impermanence input to flake.nix, extend impermanence.nix with mode option, write fresh server disko-configuration.nix
-- [ ] 08-03-PLAN.md — Rewrite flake.nix with inline host/server/vm profiles and nixosConfigurations, create identity-only hosts/configuration.nix
-- [ ] 08-04-PLAN.md — Clone NERV.nixos, copy refined structure, push, then reset test-nerv.nixos to cab4126e (checkpoint required)
+- [x] 08-01-PLAN.md — Delete 9 dead flat modules from modules/ root, verify nix flake check
+- [x] 08-02-PLAN.md — Add impermanence input to flake.nix, extend impermanence.nix with mode option, write fresh server disko-configuration.nix
+- [x] 08-03-PLAN.md — Rewrite flake.nix with inline host/server/vm profiles and nixosConfigurations, create identity-only hosts/configuration.nix
+- [x] 08-04-PLAN.md — Clone NERV.nixos, copy refined structure + .planning/, push, then reset test-nerv.nixos to cab4126e
 
 ## Progress
 
@@ -174,4 +174,4 @@ Note: Phase 5 depends only on Phase 1 (not Phase 4); it may be executed after Ph
 | 5. Home Manager Skeleton | 0/1 | Not started | - |
 | 6. Documentation Sweep | 3/3 | Complete   | 2026-03-07 |
 | 7. Flake Hardening, Disko Wiring, and Nyquist Validation | 4/4 | Complete   | 2026-03-08 |
-| 8. NERV.nixos Release & Multi-Profile Migration | 3/4 | In Progress|  |
+| 8. NERV.nixos Release & Multi-Profile Migration | 4/4 | Complete   | 2026-03-08 |

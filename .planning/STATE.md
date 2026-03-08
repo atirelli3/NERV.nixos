@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 08-legacy-module-cleanup-03-PLAN.md
-last_updated: "2026-03-08T16:16:50.981Z"
-last_activity: 2026-03-06 — Roadmap created; ready to begin Phase 1 planning
+stopped_at: Completed 08-legacy-module-cleanup-04-PLAN.md
+last_updated: "2026-03-08T16:35:00.000Z"
+last_activity: 2026-03-08 — Phase 8 complete; NERV.nixos repo populated; test-nerv.nixos reset to cab4126e
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 23
-  completed_plans: 22
-  percent: 0
+  completed_plans: 23
+  percent: 96
 ---
 
 # Project State
@@ -142,6 +142,7 @@ Recent decisions affecting current work:
 - [Phase 08-legacy-module-cleanup]: vm omits lanzaboote — VMs lack TPM2, secureboot disabled; avoids module conflicts
 - [Phase 08-legacy-module-cleanup]: hosts/hardware-configuration.nix created as placeholder at hosts/ root — required for nix import resolution
 - [Phase 08-legacy-module-cleanup]: disko.devices.disk.main.device override lives in hosts/configuration.nix — single identity file to edit per machine
+- [Phase 08-legacy-module-cleanup]: .planning/ copied to NERV.nixos before reset — full project planning context (PROJECT.md, ROADMAP.md, REQUIREMENTS.md, STATE.md, all phase plans/summaries) preserved in public repo for continued GSD workflow
 
 ### Pending Todos
 
@@ -155,6 +156,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-08T16:16:50.980Z
-Stopped at: Completed 08-legacy-module-cleanup-03-PLAN.md
+Last session: 2026-03-08T16:35:00.000Z
+Stopped at: Completed 08-legacy-module-cleanup-04-PLAN.md
 Resume file: None
