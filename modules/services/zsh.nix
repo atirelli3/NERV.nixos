@@ -80,6 +80,12 @@ in {
         gb   = "git branch";
         gst  = "git stash";
         gsp  = "git stash pop";
+        gf   = "git fetch";
+        gfa  = "git fetch --all";
+        gm   = "git merge";
+        grb  = "git rebase";
+        gsw  = "git switch";
+        gcl  = "git clone";
 
         # Nix / NixOS
         nrs  = "sudo nixos-rebuild switch --flake /etc/nixos#host";
