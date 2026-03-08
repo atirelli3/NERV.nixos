@@ -109,6 +109,60 @@ sudo nano hosts/configuration.nix
 sudo nixos-rebuild switch --flake /etc/nixos#host
 ```
 
+### C — Enabling Secure Boot (optional, post-install)
+
+Secure Boot is disabled by default (`nerv.secureboot.enable = false`). Enable it after the system is installed and booting correctly. You need a machine with a UEFI firmware that supports Setup Mode.
+
+**Prerequisites:**
+- System is installed and boots normally
+- UEFI firmware supports Secure Boot Setup Mode
+
+**Step 1 — Enter Setup Mode in UEFI**
+
+Reboot into your UEFI firmware settings and clear all existing Secure Boot keys. This puts the firmware into **Setup Mode**, which allows enrolling new keys. The exact option varies by manufacturer (look for "Secure Boot", "Key Management", "Reset to Setup Mode", or "Clear Secure Boot Keys").
+
+**Step 2 — Enable `nerv.secureboot`**
+
+```bash
+# Edit hosts/configuration.nix and set:
+nerv.secureboot.enable = true;
+
+# Rebuild and switch.
+sudo nixos-rebuild switch --flake /etc/nixos#host
+```
+
+**Step 3 — Reboot (Boot 1 of 2)**
+
+On the next boot, the `secureboot-enroll-keys` systemd service automatically:
+1. Detects that the firmware is in Setup Mode
+2. Runs `sbctl enroll-keys --microsoft` to enroll your keys (Microsoft keys included for hardware compatibility)
+3. Writes `/var/lib/secureboot-keys-enrolled` as a sentinel
+4. Reboots the machine
+
+**Step 4 — Wait for Boot 2 of 2**
+
+On the following boot, the `secureboot-enroll-tpm2` service automatically:
+1. Verifies Secure Boot is now enforcing
+2. Binds the LUKS partition to TPM2 PCR 0+7 via `systemd-cryptenroll`
+3. Writes `/var/lib/secureboot-setup-done` as a sentinel
+
+From this point, LUKS unlocks automatically on every boot as long as the Secure Boot state is unchanged (PCR 7 tracks the Secure Boot policy).
+
+**Verify the result**
+
+```bash
+sbctl status          # should show: Secure Boot enabled, Setup Mode disabled
+sbctl verify          # all boot files should be signed
+```
+
+**Re-enrollment after a firmware or key change**
+
+If you ever need to re-bind LUKS to TPM2 (e.g. after a firmware update that changes PCR 7):
+
+```bash
+luks-cryptenroll      # helper script provided by nerv — re-runs systemd-cryptenroll
+```
+
 ---
 
 ## Configuration
