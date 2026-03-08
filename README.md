@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/nerv.nixos-logo.png" width="260" alt="NERV.nixos logo" />
+  <img src="docs/assets/nerv.nixos-logo.png" width="460" alt="NERV.nixos logo" />
 </p>
 
 <h1 align="center">NERV.nixos</h1>
