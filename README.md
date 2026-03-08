@@ -1,1 +1,1 @@
-# NERV.nixos
+# nerv.nixos-template
