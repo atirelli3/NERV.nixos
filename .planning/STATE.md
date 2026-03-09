@@ -5,9 +5,9 @@ milestone_name: Stateless Disk Layout
 status: planning
 stopped_at: ~
 last_updated: "2026-03-09T00:00:00.000Z"
-last_activity: 2026-03-09 — Milestone v2.0 started
+last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,35 +21,40 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** A user declares only their machine-specific parameters and gets a secure, well-documented NixOS system out of the box.
-**Current focus:** v2.0 — Stateless Disk Layout
+**Current focus:** v2.0 — Stateless Disk Layout (phases 9–12)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Phase 9 — BTRFS Disko Layout (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-09 — Milestone v2.0 started
+Status: Roadmap complete, ready to plan Phase 9
+Last activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
+- Total plans completed: 0 (v2.0)
 - Average duration: —
 - Total execution time: 0 hours
 
-**By Phase:**
+**By Phase (v2.0):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 9. BTRFS Disko Layout | - | - | - |
+| 10. initrd BTRFS Rollback Service | - | - | - |
+| 11. Impermanence BTRFS Mode | - | - | - |
+| 12. Profile Wiring and Documentation | - | - | - |
 
 **Recent Trend:**
 - Last 5 plans: —
 - Trend: —
 
 *Updated after each plan completion*
+
+**v1.0 Historical (complete):**
 | Phase 01-flake-foundation P01 | 2 | 2 tasks | 6 files |
 | Phase 01-flake-foundation P02 | 1 | 2 tasks | 4 files |
 | Phase 02-services-reorganization P01 | 3 | 1 tasks | 1 files |
@@ -144,18 +149,29 @@ Recent decisions affecting current work:
 - [Phase 08-legacy-module-cleanup]: disko.devices.disk.main.device override lives in hosts/configuration.nix — single identity file to edit per machine
 - [Phase 08-legacy-module-cleanup]: .planning/ copied to NERV.nixos before reset — full project planning context (PROJECT.md, ROADMAP.md, REQUIREMENTS.md, STATE.md, all phase plans/summaries) preserved in public repo for continued GSD workflow
 
+### v2.0 Decisions (pre-phase)
+
+- [v2.0 pre-phase]: No new flake inputs required — disko v1.13.0 and impermanence already pinned and wired in all nixosConfigurations
+- [v2.0 pre-phase]: BTRFS rollback MUST use boot.initrd.systemd.services.rollback — boot.initrd.postDeviceCommands is incompatible with boot.initrd.systemd.enable = true (already set in boot.nix)
+- [v2.0 pre-phase]: Rollback script device path is /dev/mapper/cryptroot (not by-label) — BTRFS label is inside LUKS, inaccessible by label until after unlock; "cryptroot" is the LUKS mapping name confirmed in boot.nix
+- [v2.0 pre-phase]: No swap in BTRFS layout — BTRFS CoW is incompatible with swap files; simpler to emit no swap device in the btrfs branch
+- [v2.0 pre-phase]: @nix is a mandatory separate subvolume — if /nix is on @ it gets deleted by rollback; system becomes unbootable on next boot
+- [v2.0 pre-phase]: /var/log excluded from environment.persistence in btrfs mode — @log subvolume handles log persistence; bind-mount would conflict (double-mount)
+- [v2.0 pre-phase]: LVM initrd services (lvm.enable, preLVM, dm-snapshot) must be disabled when layout = "btrfs" — device has no LVM PV; unconditional activation causes initrd hang
+- [v2.0 pre-phase]: @root-blank must be a read-only snapshot created manually after disko run, before nixos-install — cannot be automated in disko; must be documented in install procedure (PROF-04)
+
 ### Pending Todos
 
-None yet.
+- Verify exact systemd device unit name for /dev/mapper/cryptroot in NixOS 25.11 during Phase 10 implementation (`systemctl list-units | grep cryptroot`)
+- Verify disko v1.13.0 neededForBoot support on BTRFS subvolume mounts during Phase 11 implementation (may need fileSystems."..." = { neededForBoot = true; } override)
 
 ### Blockers/Concerns
 
-- [Phase 4 pre-condition]: Lanzaboote current tag needs verification before Phase 1 pin (`gh release list -R nix-community/lanzaboote`)
-- [Phase 4 pre-condition]: Exact `nixosModules` attribute name in HM flake needs verification before Phase 1 (`nix flake show github:nix-community/home-manager`)
-- [Phase 4 pre-condition]: Existing LUKS label must be manually audited in `disko-configuration.nix` and `base/configuration.nix` before Phase 4 begins — string mismatch causes silent boot failure
+None at roadmap creation. Research flags noted above become implementation verification tasks.
 
 ## Session Continuity
 
-Last session: 2026-03-08T16:35:00.000Z
-Stopped at: Completed 08-legacy-module-cleanup-04-PLAN.md
+Last session: 2026-03-09T00:00:00.000Z
+Stopped at: v2.0 roadmap created (phases 9–12)
 Resume file: None
+Next action: /gsd:plan-phase 9
