@@ -173,7 +173,68 @@ Disko sets mountpoints via subvolumes attrset — `neededForBoot` may need to be
 
 ---
 
-### P10 — LVM Services Still Active with BTRFS Layout (Harmless but Confusing)
+### P10 — LVM initrd Active on BTRFS Layout (Boot Hang / Error)
+
+**Risk:** CRITICAL — system may hang or error in initrd when no LVM layer exists under LUKS
+
+**Symptom:** initrd tries to activate LVM on the LUKS-decrypted BTRFS partition; no VG found; boot hangs or errors.
+
+**Cause:** `boot.nix` unconditionally sets `boot.initrd.services.lvm.enable = true` and `boot.initrd.luks.devices."cryptroot".preLVM = true`. When layout is BTRFS, LUKS wraps btrfs directly (no LVM layer). The LVM activation attempts to scan a device that has no PV metadata.
+
+**Prevention:** In boot.nix, guard LVM-specific settings behind `nerv.disko.layout = "lvm"`:
+```nix
+boot.initrd.services.lvm.enable = lib.mkIf (cfg_disko.layout == "lvm") true;
+boot.initrd.luks.devices."cryptroot".preLVM = lib.mkIf (cfg_disko.layout == "lvm") true;
+boot.initrd.kernelModules = lib.optionals (cfg_disko.layout == "lvm") ["dm-snapshot" "cryptd"];
+```
+
+**Phase to address:** Phase implementing boot.nix changes (same phase as rollback service).
+
+---
+
+### P10b — /var/log Double-Mount When @log Subvolume + environment.persistence Both Declared
+
+**Risk:** HIGH — conflicting mount declarations cause boot failure or silent data loss
+
+**Symptom:** `fileSystems` contains both the @log disko mount at /var/log AND an environment.persistence bind-mount from /persist/var/log; NixOS may error or silently shadow one mount.
+
+**Cause:** BTRFS mode declares @log as a persistent subvolume at /var/log. If impermanence.nix also declares `/var/log` in `environment.persistence.directories`, the upstream module creates a bind-mount at /var/log that conflicts with the existing subvolume mount.
+
+**Prevention:** In impermanence.nix btrfs mode, **exclude /var/log from environment.persistence.directories** (it persists via the @log subvolume, not via bind-mount):
+```nix
+environment.persistence."/persist" = {
+  directories = [
+    # "/var/log" — EXCLUDED: persists via @log BTRFS subvolume, not bind-mount
+    "/var/lib/nixos"
+    "/var/lib/systemd"
+    "/etc/nixos"
+  ];
+};
+```
+
+**Phase to address:** Phase implementing impermanence.nix btrfs mode.
+
+---
+
+### P10c — btrfs-progs Not Available in systemd Initrd Store
+
+**Risk:** HIGH — rollback script fails with "btrfs: command not found" in initrd
+
+**Symptom:** Rollback systemd service exits with error; @ is not reset; system boots with dirty root.
+
+**Cause:** `boot.initrd.systemd` does not automatically include all system packages. `btrfs-progs` must be explicitly in the initrd store for the rollback script to use it.
+
+**Prevention:**
+```nix
+boot.initrd.systemd.storePaths = [pkgs.btrfs-progs];
+```
+Add to boot.nix btrfs branch alongside `boot.initrd.supportedFilesystems = ["btrfs"]`.
+
+**Phase to address:** Phase implementing boot.nix rollback service.
+
+---
+
+### P11 — LVM Services Still Active with BTRFS Layout (Harmless but Confusing)
 
 **Risk:** LOW — evaluates correctly but initrd loads unnecessary LVM modules
 

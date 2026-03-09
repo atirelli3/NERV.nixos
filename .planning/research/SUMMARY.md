@@ -60,6 +60,9 @@ Minimal-change extension of existing modules. disko.nix gets a `nerv.disko.layou
 5. **neededForBoot on @persist** — upstream impermanence module bind-mounts during early activation; /persist must be mounted first
 6. **@nix subvolume mandatory** — if /nix is on @ it gets deleted by rollback; system is unbootable on next boot
 7. **No swap file on BTRFS CoW** — BTRFS swap files require nodatacow; simpler to have no swap in BTRFS profile (or a separate swap partition)
+8. **LVM initrd active on BTRFS layout (CRITICAL)** — boot.nix sets `preLVM = true` + `lvm.enable = true` unconditionally; must be disabled for BTRFS or initrd hangs scanning a device with no PV
+9. **/var/log double-mount** — @log subvolume + environment.persistence both declaring /var/log causes conflict; exclude /var/log from persistence.directories in btrfs mode
+10. **btrfs-progs missing from systemd initrd store** — must explicitly set `boot.initrd.systemd.storePaths = [pkgs.btrfs-progs]`
 
 ## Implications for Roadmap
 
