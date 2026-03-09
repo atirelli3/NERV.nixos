@@ -11,6 +11,6 @@
 { pkgs, ... }:
 
 {
-  programs.git.enable       = true;
-  programs.fastfetch.enable = true;
+  programs.git.enable              = true;
+  environment.systemPackages       = [ pkgs.fastfetch ];
 }

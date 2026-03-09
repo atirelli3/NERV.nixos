@@ -89,11 +89,12 @@
         modules = [
           lanzaboote.nixosModules.lanzaboote
           home-manager.nixosModules.home-manager
+          impermanence.nixosModules.impermanence
           self.nixosModules.default
           hostProfile
           ./hosts/configuration.nix
           disko.nixosModules.disko
-          ./hosts/disko-configuration.nix
+          ./hosts/disko-host.nix
         ];
       };
 
@@ -116,12 +117,14 @@
       vm = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
+          lanzaboote.nixosModules.lanzaboote
           home-manager.nixosModules.home-manager
+          impermanence.nixosModules.impermanence
           self.nixosModules.default
           vmProfile
           ./hosts/configuration.nix
           disko.nixosModules.disko
-          ./hosts/disko-configuration.nix
+          ./hosts/disko-host.nix
         ];
       };
     };
