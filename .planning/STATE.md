@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-03-09T23:44:49.316Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-03-09T23:47:10.717Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 12
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 25
-  completed_plans: 24
+  completed_plans: 25
   percent: 0
 ---
 
@@ -78,6 +78,7 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 08-legacy-module-cleanup P02 | 2 | 2 tasks | 3 files |
 | Phase 08-legacy-module-cleanup P03 | 2 | 2 tasks | 3 files |
 | Phase 09-btrfs-disko-layout P01 | 2 | 1 tasks | 1 files |
+| Phase 09-btrfs-disko-layout P02 | 1 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,8 @@ Recent decisions affecting current work:
 - [Phase 09-btrfs-disko-layout]: sharedEsp and sharedLuksOuter let bindings factor shared disk partition config for both BTRFS and LVM branches
 - [Phase 09-btrfs-disko-layout]: @root-blank declared as empty attrset with no mountpoint — Phase 10 rollback snapshot baseline
 - [Phase 09-btrfs-disko-layout]: All impermanence.mode references removed from disko.nix — depends only on cfg.layout
+- [Phase 09-btrfs-disko-layout]: nerv.disko.layout = PLACEHOLDER intentionally invalid — forces operator to set btrfs or lvm before building, same pattern as nerv.hostname
+- [Phase 09-btrfs-disko-layout]: nerv.disko.lvm.* declared unconditionally in configuration.nix — self-documenting; module only reads them when layout = lvm
 
 ### v2.0 Decisions (pre-phase)
 
@@ -176,7 +179,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-09T23:44:49.314Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-03-09T23:47:10.715Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
 Next action: /gsd:plan-phase 9

@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: NERV.nixos Release & Multi-Profile Migration** - Delete dead flat modules, add full impermanence for server, define host/server/vm profiles in flake.nix, migrate to NERV.nixos repo, reset test repo to baseline (completed 2026-03-08)
 
 **v2.0 Phases (Current Milestone):**
-- [ ] **Phase 9: BTRFS Disko Layout** - Add nerv.disko.layout option to disko.nix with BTRFS subvolume branch and explicit LVM option
+- [x] **Phase 9: BTRFS Disko Layout** - Add nerv.disko.layout option to disko.nix with BTRFS subvolume branch and explicit LVM option (completed 2026-03-09)
 - [ ] **Phase 10: initrd BTRFS Rollback Service** - Wire btrfs-progs into initrd and add systemd rollback service that resets root on every boot
 - [ ] **Phase 11: Impermanence BTRFS Mode** - Add nerv.impermanence.mode = "btrfs" path with explicit persistence rules and neededForBoot on /persist
 - [ ] **Phase 12: Profile Wiring and Documentation** - Wire layout/mode options into all profiles, update module section-headers, document install procedure
@@ -238,7 +238,7 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 6. Documentation Sweep | 3/3 | Complete | 2026-03-07 |
 | 7. Flake Hardening, Disko Wiring, and Nyquist Validation | 4/4 | Complete | 2026-03-08 |
 | 8. NERV.nixos Release & Multi-Profile Migration | 4/4 | Complete | 2026-03-08 |
-| 9. BTRFS Disko Layout | 1/2 | In Progress|  |
+| 9. BTRFS Disko Layout | 2/2 | Complete   | 2026-03-09 |
 | 10. initrd BTRFS Rollback Service | 0/TBD | Not started | - |
 | 11. Impermanence BTRFS Mode | 0/TBD | Not started | - |
 | 12. Profile Wiring and Documentation | 0/TBD | Not started | - |
