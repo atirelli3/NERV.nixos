@@ -1,9 +1,10 @@
 # Requirements: nerv.nixos
 
 **Defined:** 2026-03-06
+**Updated:** 2026-03-09 (v2.0 milestone)
 **Core Value:** A user declares only their machine-specific parameters and gets a secure, well-documented NixOS system out of the box.
 
-## v1 Requirements
+## v1 Requirements (Complete)
 
 ### Structure
 
@@ -40,25 +41,53 @@
 
 ## v2 Requirements
 
+### Disk Layout (DISKO)
+
+- [ ] **DISKO-01**: User can set `nerv.disko.layout = "btrfs"` to get a GPT/LUKS/BTRFS disk with subvolumes @, @root-blank, @home, @nix, @persist, @log declared in `disko.nix`
+- [ ] **DISKO-02**: User can set `nerv.disko.layout = "lvm"` to get the existing GPT/LUKS/LVM layout (swap + root LV or store + persist LVs depending on impermanence mode)
+- [ ] **DISKO-03**: BTRFS subvolumes use mount options `compress=zstd:3`, `noatime`, `space_cache=v2`; no swap LV is emitted in BTRFS layout (BTRFS CoW incompatibility with swap files)
+
+### Boot / Rollback (BOOT)
+
+- [ ] **BOOT-01**: When `nerv.disko.layout = "btrfs"`, initrd includes btrfs-progs via `boot.initrd.supportedFilesystems = ["btrfs"]` and `boot.initrd.systemd.storePaths = [pkgs.btrfs-progs]`
+- [ ] **BOOT-02**: When `nerv.disko.layout = "btrfs"`, a `boot.initrd.systemd.services.rollback` unit runs after `dev-mapper-cryptroot.device`, before `sysroot.mount`, deletes `@`, and snapshots `@root-blank → @` — resetting root on every reboot
+- [ ] **BOOT-03**: LVM initrd services (`boot.initrd.services.lvm.enable`, `preLVM = true`, `dm-snapshot` kernel module) are only active when `nerv.disko.layout = "lvm"` — disabled for BTRFS to prevent initrd hang on a device with no LVM PV
+
+### Persistence (PERSIST)
+
+- [ ] **PERSIST-01**: `nerv.impermanence.mode = "btrfs"` activates `environment.persistence."/persist"` without a tmpfs `/` (rollback resets root); persistence rules declare machine-id, SSH host keys, `/var/lib/nixos`, `/var/lib/systemd`, `/etc/nixos` — `/var/log` is excluded (persisted via @log subvolume, not bind-mount)
+- [ ] **PERSIST-02**: `/persist` (the @persist subvolume) has `neededForBoot = true` when mode = "btrfs" so upstream impermanence bind-mounts are available before services start
+
+### Profiles & Documentation (PROF)
+
+- [ ] **PROF-01**: `hostProfile` in `flake.nix` declares `nerv.disko.layout = "btrfs"` and `nerv.impermanence.mode = "btrfs"`
+- [ ] **PROF-02**: `serverProfile` and `vmProfile` declare `nerv.disko.layout = "lvm"` explicitly
+- [ ] **PROF-03**: Section-header comments on `disko.nix`, `boot.nix`, and `impermanence.nix` are updated to reflect new options and behavior
+- [ ] **PROF-04**: Install procedure documents the required post-disko manual step: `btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank` to create the clean rollback baseline
+
+## Future Requirements
+
+### Disk Layout
+
+- **DISKO-V3-01**: Configurable `nerv.disko.tmpfsSize` for server profile (currently hardcoded 2G in impermanence.nix)
+- **DISKO-V3-02**: @log subvolume configurable (on/off toggle)
+
 ### Options API
 
-- **OPT-V2-01**: `nerv.nix.autoUpdate` — auto-upgrade toggle (disabled by default)
-- **OPT-V2-02**: `nerv.kernel.package` — override kernel package (currently hardcoded to latest)
-- **OPT-V2-03**: `nerv.nix.gcInterval` — GC frequency option
-
-### Structure
-
-- **STRUCT-V2-01**: Per-target flake profiles (desktop, server, VM) built from composed module sets
-- **STRUCT-V2-02**: Host-specific example configuration templates
+- **OPT-V3-01**: `nerv.nix.autoUpdate` — auto-upgrade toggle (disabled by default)
+- **OPT-V3-02**: `nerv.kernel.package` — override kernel package (currently hardcoded to zen)
+- **OPT-V3-03**: `nerv.nix.gcInterval` — GC frequency option
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
 | DE/WM/DM configuration | Belongs in host flake, not base modules |
-| Full home impermanence ($HOME on tmpfs) | Too opinionated for a general base |
+| Full $HOME on tmpfs | User data loss on reboot; @home BTRFS subvolume is the correct approach |
 | Home Manager dotfiles | Skeleton only; actual dotfiles are user responsibility |
-| `PasswordAuthentication = true` as an easy option | Security regression — `lib.mkForce` escape hatch documented instead |
+| Snapper integration | Orthogonal concern; scope creep; users add if needed |
+| BTRFS RAID | Multi-disk assumption breaks single-disk disko layout |
+| Automated LVM→BTRFS migration | Too risky to automate; backup/restore is user responsibility |
 | Per-sysctl boolean toggles | Too granular; defeats hardening coherence |
 
 ## Traceability
@@ -86,12 +115,24 @@
 | DOCS-02 | Phase 6 | Complete |
 | DOCS-03 | Phase 6 | Complete |
 | DOCS-04 | Phase 6 | Complete |
+| DISKO-01 | Phase 9 | Pending |
+| DISKO-02 | Phase 9 | Pending |
+| DISKO-03 | Phase 9 | Pending |
+| BOOT-01 | Phase 10 | Pending |
+| BOOT-02 | Phase 10 | Pending |
+| BOOT-03 | Phase 10 | Pending |
+| PERSIST-01 | Phase 11 | Pending |
+| PERSIST-02 | Phase 11 | Pending |
+| PROF-01 | Phase 12 | Pending |
+| PROF-02 | Phase 12 | Pending |
+| PROF-03 | Phase 12 | Pending |
+| PROF-04 | Phase 12 | Pending |
 
 **Coverage:**
-- v1 requirements: 21 total
-- Mapped to phases: 21
+- v2 requirements: 12 total
+- Mapped to phases: 12
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-06*
-*Last updated: 2026-03-06 after roadmap creation (corrected count from 18 to 21; updated phase assignments to match ROADMAP.md)*
+*Last updated: 2026-03-09 after v2.0 milestone definition*
