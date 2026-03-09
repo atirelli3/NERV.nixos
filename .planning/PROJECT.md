@@ -24,13 +24,12 @@ A user should be able to declare only their machine-specific parameters and get 
 
 ### Active
 
-- [ ] Reorganize repo into nested modules/system/ + modules/services/ structure
-- [ ] Add home/ skeleton for Home Manager integration
-- [ ] Add impermanence module for tmpfs on ~/Downloads, /tmp, ~/Desktop
-- [ ] Expose NixOS module options API for user-overridable parameters (openssh, hardware, locale)
-- [ ] Add section-header + inline documentation to all modules and base files
-- [ ] Extract boot/disk config from configuration.nix into modules/system/boot.nix
-- [ ] Separate hardware CPU/GPU config into modules/system/hardware.nix with typed options
+- [ ] Desktop profile: BTRFS disk layout with subvolumes (@, @root-blank, @home, @nix, @persist, @log)
+- [ ] Desktop profile: initrd boot rollback (delete @, snapshot @root-blank → @) for stateless root
+- [ ] Server profile: tmpfs root with /nix and /persist on disk via disko + impermanence
+- [ ] Integrate nix-community/impermanence module (upstream) for environment.persistence declarations
+- [ ] nerv.disko module: per-profile disko layout (BTRFS for desktop, LVM ext4 for server)
+- [ ] Declarative persistence rules wired per profile (machine-id, /var/lib, /etc/nixos, SSH host keys)
 
 ### Out of Scope
 
@@ -71,5 +70,15 @@ Key reference implementations used during initial development:
 | Single-repo under /etc/nerv — hosts/ subdir replaces /etc/nixos | path:.. fails in pure eval when /etc/nerv is a nix store symlink; root flake with self references avoids cross-flake path issues entirely | Decided 2026-03-06 |
 | Home Manager user dotfiles in $HOME, not in this repo | System-level wiring (NixOS module) belongs here; user-specific packages/dotfiles belong in a user-owned repo under $HOME — different ownership, different change rate | Decided 2026-03-06 |
 
+## Current Milestone: v2.0 Stateless Disk Layout
+
+**Goal:** Implement stateless OS design for both desktop (BTRFS + snapshot rollback) and server (tmpfs root) profiles using declarative disko layouts and the upstream impermanence module.
+
+**Target features:**
+- Desktop: BTRFS subvolumes with @root-blank snapshot + initrd rollback
+- Server: tmpfs root with /nix and /persist on disk
+- Upstream impermanence module integration for explicit persistence declarations
+- nerv.disko module covering both layout types
+
 ---
-*Last updated: 2026-03-06 after initialization*
+*Last updated: 2026-03-09 after v2.0 milestone start*

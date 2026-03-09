@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
+milestone: v2.0
+milestone_name: Stateless Disk Layout
 status: planning
-stopped_at: Completed 08-legacy-module-cleanup-04-PLAN.md
-last_updated: "2026-03-08T16:35:00.000Z"
-last_activity: 2026-03-08 — Phase 8 complete; NERV.nixos repo populated; test-nerv.nixos reset to cab4126e
+stopped_at: ~
+last_updated: "2026-03-09T00:00:00.000Z"
+last_activity: 2026-03-09 — Milestone v2.0 started
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 23
-  completed_plans: 23
-  percent: 96
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-06)
+See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** A user declares only their machine-specific parameters and gets a secure, well-documented NixOS system out of the box.
-**Current focus:** Phase 1 — Flake Foundation
+**Current focus:** v2.0 — Stateless Disk Layout
 
 ## Current Position
 
-Phase: 1 of 6 (Flake Foundation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-06 — Roadmap created; ready to begin Phase 1 planning
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-09 — Milestone v2.0 started
 
 Progress: [░░░░░░░░░░] 0%
 
