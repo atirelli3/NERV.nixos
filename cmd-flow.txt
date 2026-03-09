@@ -1,0 +1,38 @@
+[nixos@nixos:/mnt/etc/nixos]$ history
+    1  mkdir -p /mnt/etc/nixos
+    2  sudo mkdir -p /mnt/etc/nixos
+    3  git clone https://github.com/atirelli3/NERV.nixos.git /mnt/etc/nixos
+    4  sudo git clone https://github.com/atirelli3/NERV.nixos.git /mnt/etc/nixos
+    5  sudo cd /mnt/etc/nixos
+    6  cd /mnt/etc/nixos/
+    7  ls
+    8  sudo vim hosts/disko-configuration.nix
+    9  nix --experimental-features "nix-command flakes" run github:nix-community/disko/v1.13.0 --   --mode destroy,format,mount hosts/disko-configuration.nix
+   10  sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/v1.13.0 --   --mode destroy,format,mount hosts/disko-configuration.nix
+   11  echo -n "nixos" > /tmp/luks-password
+   12  sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/v1.13.0 --   --mode destroy,format,mount hosts/disko-configuration.nix
+   13  sudo rm -rf /tmp/luks-password
+   14  lsblk -o name,label,size,type,mountpoints /dev/vda
+   15  sudo nixos-generate-config --no-filesystems --root /mnt
+   16  ls
+   17  cat configuration.nix
+   18  ls
+   19  sudo rm -rf configuration.nix
+   20  sudo cp /mnt/etc/nixos/hardware-configuration.nix hosts/hardware-configuration.nix
+   21  ls
+   22  ls hosts/
+   23  cat hosts/hardware-configuration.nix
+   24  rm -rf hardware-configuration.nix
+   25  sudo rm -rf hardware-configuration.nix
+   26  sudo vim hosts/configuration.nix
+   27  sudo vim flake.nix
+   28  sudo nixos-install --flake /mnt/etc/nixos#host
+   29  cat flake.nix
+   30  sudo vim flake.nix
+   31  sudo nixos-install --flake /mnt/etc/nixos#host
+   32  sudo vim modules/system/packages.nix
+   33  sudo nix flake update
+   34  sudo nixos-install --flake /mnt/etc/nixos#host
+   35  sudo vim hosts/configuration.nix
+   36  sudo nixos-install --flake /mnt/etc/nixos#host
+   37  history
