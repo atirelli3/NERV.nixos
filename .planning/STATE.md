@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Phase 9 context gathered
-last_updated: "2026-03-09T20:53:01.559Z"
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-03-09T23:44:49.316Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 12
   completed_phases: 8
-  total_plans: 23
-  completed_plans: 23
+  total_plans: 25
+  completed_plans: 24
   percent: 0
 ---
 
@@ -77,6 +77,7 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 08-legacy-module-cleanup P01 | 1 | 2 tasks | 9 files |
 | Phase 08-legacy-module-cleanup P02 | 2 | 2 tasks | 3 files |
 | Phase 08-legacy-module-cleanup P03 | 2 | 2 tasks | 3 files |
+| Phase 09-btrfs-disko-layout P01 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,10 @@ Recent decisions affecting current work:
 - [Phase 08-legacy-module-cleanup]: hosts/hardware-configuration.nix created as placeholder at hosts/ root — required for nix import resolution
 - [Phase 08-legacy-module-cleanup]: disko.devices.disk.main.device override lives in hosts/configuration.nix — single identity file to edit per machine
 - [Phase 08-legacy-module-cleanup]: .planning/ copied to NERV.nixos before reset — full project planning context (PROJECT.md, ROADMAP.md, REQUIREMENTS.md, STATE.md, all phase plans/summaries) preserved in public repo for continued GSD workflow
+- [Phase 09-btrfs-disko-layout]: nerv.disko.layout has no default — forces explicit declaration per host, consistent with nerv.hostname pattern
+- [Phase 09-btrfs-disko-layout]: sharedEsp and sharedLuksOuter let bindings factor shared disk partition config for both BTRFS and LVM branches
+- [Phase 09-btrfs-disko-layout]: @root-blank declared as empty attrset with no mountpoint — Phase 10 rollback snapshot baseline
+- [Phase 09-btrfs-disko-layout]: All impermanence.mode references removed from disko.nix — depends only on cfg.layout
 
 ### v2.0 Decisions (pre-phase)
 
@@ -171,7 +176,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-09T20:53:01.557Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-btrfs-disko-layout/09-CONTEXT.md
+Last session: 2026-03-09T23:44:49.314Z
+Stopped at: Completed 09-01-PLAN.md
+Resume file: None
 Next action: /gsd:plan-phase 9

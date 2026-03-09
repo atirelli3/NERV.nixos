@@ -43,9 +43,9 @@
 
 ### Disk Layout (DISKO)
 
-- [ ] **DISKO-01**: User can set `nerv.disko.layout = "btrfs"` to get a GPT/LUKS/BTRFS disk with subvolumes @, @root-blank, @home, @nix, @persist, @log declared in `disko.nix`
-- [ ] **DISKO-02**: User can set `nerv.disko.layout = "lvm"` to get the existing GPT/LUKS/LVM layout (swap + root LV or store + persist LVs depending on impermanence mode)
-- [ ] **DISKO-03**: BTRFS subvolumes use mount options `compress=zstd:3`, `noatime`, `space_cache=v2`; no swap LV is emitted in BTRFS layout (BTRFS CoW incompatibility with swap files)
+- [x] **DISKO-01**: User can set `nerv.disko.layout = "btrfs"` to get a GPT/LUKS/BTRFS disk with subvolumes @, @root-blank, @home, @nix, @persist, @log declared in `disko.nix`
+- [x] **DISKO-02**: User can set `nerv.disko.layout = "lvm"` to get the existing GPT/LUKS/LVM layout (swap + root LV or store + persist LVs depending on impermanence mode)
+- [x] **DISKO-03**: BTRFS subvolumes use mount options `compress=zstd:3`, `noatime`, `space_cache=v2`; no swap LV is emitted in BTRFS layout (BTRFS CoW incompatibility with swap files)
 
 ### Boot / Rollback (BOOT)
 
@@ -115,9 +115,9 @@
 | DOCS-02 | Phase 6 | Complete |
 | DOCS-03 | Phase 6 | Complete |
 | DOCS-04 | Phase 6 | Complete |
-| DISKO-01 | Phase 9 | Pending |
-| DISKO-02 | Phase 9 | Pending |
-| DISKO-03 | Phase 9 | Pending |
+| DISKO-01 | Phase 9 | Complete |
+| DISKO-02 | Phase 9 | Complete |
+| DISKO-03 | Phase 9 | Complete |
 | BOOT-01 | Phase 10 | Pending |
 | BOOT-02 | Phase 10 | Pending |
 | BOOT-03 | Phase 10 | Pending |
