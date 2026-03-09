@@ -5,7 +5,8 @@
 #            settings are controlled by the profile in flake.nix (hostProfile,
 #            serverProfile, or vmProfile).
 # Entry    : nerv.hostname, nerv.primaryUser, nerv.hardware.*, nerv.locale.*,
-#            system.stateVersion, disko.devices.disk.main.device
+#            system.stateVersion, disko.devices.disk.main.device,
+#            nerv.disko.layout, nerv.disko.lvm.*
 # Override : Edit this file. Replace all PLACEHOLDER values before first boot.
 # Note     : hardware-configuration.nix is a placeholder — replace with the
 #            output of nixos-generate-config on the target machine.
@@ -37,4 +38,12 @@
   # Disk device for disko — replace with the actual target disk.
   # Find with: lsblk -d -o NAME,SIZE,MODEL
   disko.devices.disk.main.device = "/dev/PLACEHOLDER";  # e.g. "/dev/nvme0n1"
+
+  # Disk layout type — replace PLACEHOLDER with "btrfs" (desktop/laptop) or "lvm" (server).
+  nerv.disko.layout = "PLACEHOLDER";  # "btrfs" for desktop/laptop | "lvm" for server
+
+  # LVM sizes — only relevant when nerv.disko.layout = "lvm". Replace PLACEHOLDER values.
+  nerv.disko.lvm.swapSize    = "PLACEHOLDER";  # e.g. "16G"  (2x RAM; free -h)
+  nerv.disko.lvm.storeSize   = "PLACEHOLDER";  # e.g. "60G"  (/nix ext4)
+  nerv.disko.lvm.persistSize = "PLACEHOLDER";  # e.g. "20G"  (/persist ext4)
 }
