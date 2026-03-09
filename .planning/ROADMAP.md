@@ -120,7 +120,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Every `.nix` file in `modules/` and `hosts/nixos-base/` opens with a section-header comment stating its purpose, defaults, and override entry points
   2. Non-obvious configuration lines throughout all modules carry an inline `#` comment explaining their purpose or security rationale
-  3. `disko-configuration.nix` has a prominent warning block at the top listing all placeholder values that must be replaced before use (`/dev/DISK`, `SIZE_RAM * 2`)
+  3. `disko-configuration.nix` has a prominent warning comment block at the top listing all placeholder values that must be replaced before use (`/dev/DISK`, `SIZE_RAM * 2`)
   4. The LUKS label string is present in both `disko-configuration.nix` and `boot.nix` with a comment in each file explicitly cross-referencing the other file
 **Plans**: 3 plans
 
@@ -181,7 +181,11 @@ Plans:
   2. Setting `nerv.disko.layout = "btrfs"` causes disko to declare a GPT disk with ESP + LUKS partition containing a BTRFS filesystem with subvolumes `@`, `@root-blank`, `@home`, `@nix`, `@persist`, and `@log`
   3. BTRFS subvolumes are mounted with `compress=zstd:3`, `noatime`, and `space_cache=v2`; no swap LV or swap partition is declared in the BTRFS branch
   4. Setting `nerv.disko.layout = "lvm"` produces the existing GPT/LUKS/LVM disk layout (same behavior as before v2.0)
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Rewrite modules/system/disko.nix with nerv.disko.layout enum, BTRFS branch (6 subvolumes), and LVM branch under lib.mkIf isLvm
+- [ ] 09-02-PLAN.md — Update hosts/configuration.nix to new nerv.disko.layout + nerv.disko.lvm.* API, verify parse
 
 ### Phase 10: initrd BTRFS Rollback Service
 **Goal**: When BTRFS layout is active, the initrd includes btrfs-progs and runs a systemd rollback service that deletes @ and re-snapshots @root-blank → @ before root is mounted, resetting the root filesystem on every boot; LVM initrd services are disabled for BTRFS to prevent initrd hang
@@ -234,7 +238,7 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 6. Documentation Sweep | 3/3 | Complete | 2026-03-07 |
 | 7. Flake Hardening, Disko Wiring, and Nyquist Validation | 4/4 | Complete | 2026-03-08 |
 | 8. NERV.nixos Release & Multi-Profile Migration | 4/4 | Complete | 2026-03-08 |
-| 9. BTRFS Disko Layout | 0/TBD | Not started | - |
+| 9. BTRFS Disko Layout | 0/2 | Not started | - |
 | 10. initrd BTRFS Rollback Service | 0/TBD | Not started | - |
 | 11. Impermanence BTRFS Mode | 0/TBD | Not started | - |
 | 12. Profile Wiring and Documentation | 0/TBD | Not started | - |
