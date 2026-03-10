@@ -130,5 +130,48 @@ in {
         ];
       };
     })
+
+    (lib.mkIf (cfg.mode == "btrfs") {
+      # /persist must be available before impermanence bind mounts execute in stage 2.
+      # disko v1.13.0 does not support neededForBoot on subvolume mounts (issues #192, #594
+      # closed as "use fileSystems directly"); this override is the canonical approach.
+      fileSystems."${cfg.persistPath}".neededForBoot = lib.mkDefault true;
+
+      # environment.persistence — bind mounts from /persist for desktop/laptop BTRFS mode.
+      # Root is reset to @root-blank on every boot (Phase 10 rollback service), so /var/lib
+      # is empty at stage 2 activation — no bind-over-content risk.
+      # Requires impermanence.nixosModules.impermanence in nixosConfigurations modules list.
+      environment.persistence."${cfg.persistPath}" = {
+        hideMounts = true;
+        directories = [
+          "/var/lib"   # all service state: uid/gid (nixos), timers (systemd), sbctl, BT, NM, cups...
+          "/etc/nixos" # NERV.nixos repo — user clones here, must survive rollback
+          # NOTE: /var/log intentionally omitted — persisted by @log BTRFS subvolume (disko.nix).
+          #       Adding it here would create a double-mount conflict at stage-2 activation.
+        ];
+        files = [
+          "/etc/machine-id"                    # stable machine identity (journald, systemd)
+          "/etc/ssh/ssh_host_ed25519_key"      # SSH host identity — must survive rollback
+          "/etc/ssh/ssh_host_ed25519_key.pub"
+          "/etc/ssh/ssh_host_rsa_key"
+          "/etc/ssh/ssh_host_rsa_key.pub"
+        ];
+      };
+
+      # Belt-and-suspenders: /var/lib as a single broad entry already covers /var/lib/sbctl.
+      # This warning fires only if someone strips the persistence list and forgets sbctl.
+      # Using lib.warn (not assertion) — preserves nix flake check during multi-step migrations;
+      # missing sbctl persistence loses keys on next rollback but is recoverable via re-enrollment,
+      # unlike the IMPL-02 scenario (tmpfs wipe) which uses a hard assertion.
+      warnings =
+        let
+          persistDirs = [ "/var/lib" "/etc/nixos" ];
+          sbctlCovered = lib.any
+            (d: d == "/var/lib" || d == "/var/lib/sbctl" || lib.hasPrefix "/var/lib/sbctl" d)
+            persistDirs;
+        in
+          lib.optionals (config.nerv.secureboot.enable && !sbctlCovered)
+            [ "nerv: secureboot is enabled but /var/lib/sbctl is not covered by environment.persistence in btrfs mode — sbctl keys will be lost on rollback." ];
+    })
   ]);
 }
