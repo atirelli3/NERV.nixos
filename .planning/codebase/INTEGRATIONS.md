@@ -2,182 +2,132 @@
 
 **Analysis Date:** 2026-03-10
 
-## Upstream Nix Flake Inputs
+## APIs & External Services
 
-These are the only external dependencies. All are fetched by Nix at build/eval time — no runtime
-network calls from the system configuration itself.
-
-**NixOS Package Set:**
-- `nixpkgs` — `github:NixOS/nixpkgs/nixos-unstable`
+**Upstream Nix Registries:**
+- `github:NixOS/nixpkgs/nixos-unstable` — primary package source; fetched by Nix daemon on build/upgrade
+  - SDK/Client: Nix flake input (`nixpkgs` in `flake.nix`)
   - Auth: none (public GitHub)
-  - Role: base package set for all `pkgs.*` and `lib.*` usage across every module
 
-**Disk Layout:**
-- `disko` — `github:nix-community/disko/v1.13.0` (pinned by tag)
-  - Follows: `nixpkgs`
-  - Role: `disko.nixosModules.disko` — declarative GPT/LUKS partitioning in `modules/system/disko.nix`
-
-**Impermanence:**
-- `impermanence` — `github:nix-community/impermanence` (HEAD, no nixpkgs input — no follows)
-  - Role: `impermanence.nixosModules.impermanence` — `environment.persistence` bind-mounts in
-    `modules/system/impermanence.nix`
-
-**Home Manager:**
-- `home-manager` — `github:nix-community/home-manager`
-  - Follows: `nixpkgs`
-  - Role: `home-manager.nixosModules.home-manager` — user dotfile management wired in `home/default.nix`
-
-**Secure Boot:**
-- `lanzaboote` — `github:nix-community/lanzaboote`
-  - Follows: `nixpkgs`
-  - Role: `lanzaboote.nixosModules.lanzaboote` — replaces systemd-boot when `nerv.secureboot.enable = true`;
-    configured in `modules/system/secureboot.nix`
+**Community Flake Inputs (all declared in `flake.nix`):**
+- `github:nix-community/lanzaboote` — Secure Boot bootloader library
+  - SDK/Client: `lanzaboote.nixosModules.lanzaboote` imported in `flake.nix` `nixosConfigurations`
+  - Auth: none (public GitHub)
+- `github:nix-community/home-manager` — user dotfile management
+  - SDK/Client: `home-manager.nixosModules.home-manager` imported in `flake.nix` `nixosConfigurations`
+  - Auth: none (public GitHub)
+- `github:nix-community/disko/v1.13.0` — declarative disk partitioning (pinned to v1.13.0)
+  - SDK/Client: `disko.nixosModules.disko` imported in `flake.nix` `nixosConfigurations`; also invoked directly via `nix run github:nix-community/disko/v1.13.0` during install
+  - Auth: none (public GitHub)
+- `github:nix-community/impermanence` — `environment.persistence` bind-mount module
+  - SDK/Client: `impermanence.nixosModules.impermanence` imported in `flake.nix` `nixosConfigurations`
+  - Auth: none (public GitHub)
 
 ## Data Storage
 
 **Databases:**
-- None — this is a NixOS configuration library, not an application
+- None — this is a NixOS system configuration library; no application databases
 
-**Filesystem layouts (target machine, declared in `modules/system/disko.nix`):**
+**Filesystem Layouts (declared in `modules/system/disko.nix`):**
 
-BTRFS layout (`nerv.disko.layout = "btrfs"` — desktop/laptop):
-- `/boot` — vfat, label `NIXBOOT`, 1G ESP
-- LUKS container — label `NIXLUKS`, TRIM enabled
-- BTRFS pool — label `NIXBTRFS`, subvolumes:
-  - `/@` → `/` (compress=zstd:3)
-  - `/@root-blank` → no mountpoint (rollback baseline)
-  - `/@home` → `/home`
-  - `/@nix` → `/nix`
-  - `/@persist` → `/persist`
-  - `/@log` → `/var/log`
+- BTRFS layout (desktop/laptop — `nerv.disko.layout = "btrfs"`):
+  - Partition scheme: GPT → 1G FAT32 ESP (`/boot`, label `NIXBOOT`) → LUKS container (`NIXLUKS`) → BTRFS volume (`NIXBTRFS`)
+  - Subvolumes: `/@` (`/`), `/@root-blank` (rollback baseline), `/@home` (`/home`), `/@nix` (`/nix`), `/@persist` (`/persist`), `/@log` (`/var/log`)
+  - Mount options: `compress=zstd:3`, `noatime`, `space_cache=v2` on all subvolumes
+  - LUKS: `cryptroot` device, `allowDiscards = true` (TRIM pass-through), label `NIXLUKS`
 
-LVM layout (`nerv.disko.layout = "lvm"` — server):
-- `/boot` — vfat, label `NIXBOOT`, 1G ESP
-- LUKS container — label `NIXLUKS`, TRIM enabled
-- LVM VG `lvmroot` with LVs:
-  - `swap` — label `NIXSWAP`
-  - `store` → `/nix` — ext4, label `NIXSTORE`
-  - `persist` → `/persist` — ext4, label `NIXPERSIST`
+- LVM layout (server — `nerv.disko.layout = "lvm"`):
+  - Partition scheme: GPT → 1G FAT32 ESP (`/boot`, label `NIXBOOT`) → LUKS container (`NIXLUKS`) → LVM PV → VG `lvmroot`
+  - Logical volumes: `swap` (label `NIXSWAP`), `store` (ext4, `/nix`, label `NIXSTORE`), `persist` (ext4, `/persist`, label `NIXPERSIST`)
+  - Sizes: configured via `nerv.disko.lvm.swapSize`, `nerv.disko.lvm.storeSize`, `nerv.disko.lvm.persistSize`
 
-**File Storage:**
-- Local filesystem only — no cloud storage integration
-
-**Caching:**
-- Nix binary cache — default `cache.nixos.org` (built into nixpkgs, not configured explicitly here)
-- No application-level caching
+**Nix Store:**
+- Location: `/nix/store` — managed by Nix daemon
+- Optimization: `auto-optimise-store = true` (hardlinks) + weekly full pass (`nix.optimise`)
+- GC: weekly, deletes generations older than 20 days (`modules/system/nix.nix`)
 
 ## Authentication & Identity
 
-**SSH (when `nerv.openssh.enable = true`):**
-- Implementation: `modules/services/openssh.nix`
-- Key-based auth only by default (`PasswordAuthentication = false`, `KbdInteractiveAuth = false`)
-- SSH daemon on non-standard port (default `2222`); port `22` reserved for endlessh tarpit
-- Host keys persisted to `/persist` via `environment.persistence` in `modules/system/impermanence.nix`:
-  - `/etc/ssh/ssh_host_ed25519_key` + `.pub`
-  - `/etc/ssh/ssh_host_rsa_key` + `.pub`
-- Machine identity: `/etc/machine-id` persisted to `/persist`
+**Full Disk Encryption — LUKS:**
+- Implementation: LUKS container `cryptroot` on `/dev/disk/by-label/NIXLUKS`
+- Declared in: `modules/system/disko.nix` (format args) and shared unlock block
+- Password unlock: `passwordFile = "/tmp/luks-password"` pre-seeded by install script during partitioning
+- TPM2 auto-unlock: enrolled by `secureboot-enroll-tpm2` service in `modules/system/secureboot.nix`, binds to PCR 0+7 via `systemd-cryptenroll`
 
-**Secure Boot / LUKS (when `nerv.secureboot.enable = true`):**
+**Secure Boot — Lanzaboote + sbctl:**
 - Implementation: `modules/system/secureboot.nix`
-- Lanzaboote — PKI bundle at `/var/lib/sbctl` (persisted via `environment.persistence`)
-- TPM2 LUKS auto-unlock — sealed to PCRs `0+7` via `systemd-cryptenroll`
-- First-boot automation: two-phase systemd services:
-  - `secureboot-enroll-keys.service` — enrolls SB keys and reboots
-  - `secureboot-enroll-tpm2.service` — binds LUKS to TPM2 on second boot
-- Re-enrollment helper: `luks-cryptenroll` script placed in `environment.systemPackages`
-- No external auth provider — all local/TPM2
+- Key storage: `/var/lib/sbctl` (must be persisted via `environment.persistence`)
+- Enrollment: `secureboot-enroll-keys` systemd service runs `sbctl enroll-keys --microsoft` on first boot in Setup Mode
+- TPM2 binding: `secureboot-enroll-tpm2` service runs `systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=0+7` on second boot
+- Sentinels: `/var/lib/secureboot-keys-enrolled`, `/var/lib/secureboot-setup-done`
+- Re-enrollment helper: `luks-cryptenroll` script in `systemPackages`
 
-**sudo:**
-- `security.sudo.execWheelOnly = true` — only `wheel` group members may use sudo (`modules/system/security.nix`)
+**SSH Authentication:**
+- Implementation: `modules/services/openssh.nix`
+- Method: key-based only by default (`PasswordAuthentication = false`, `KbdInteractiveAuthentication = false`)
+- Root login: disabled (`PermitRootLogin = "no"`)
+- Host keys persisted via `environment.persistence` (`/etc/ssh/ssh_host_ed25519_key`, `ssh_host_rsa_key` and their `.pub` files)
+
+**Machine Identity:**
+- `/etc/machine-id` — persisted via `environment.persistence` in both impermanence modes (`modules/system/impermanence.nix`)
+
+**User Management:**
+- `nerv.primaryUser` list auto-wires `wheel` and `networkmanager` groups (`modules/system/identity.nix`)
+- `sudo` restricted to wheel group only (`security.sudo.execWheelOnly = true` in `modules/system/security.nix`)
+- Nix daemon access restricted to `@wheel` (`nix.settings.allowed-users` in `modules/system/nix.nix`)
 
 ## Monitoring & Observability
 
-**Antivirus:**
-- ClamAV — `services.clamav.daemon.enable = true`, `services.clamav.updater.enable = true`
-  - Definition updates: 24 checks/day via `freshclam`
-  - Configured in `modules/system/security.nix`
-
-**File Integrity:**
-- AIDE — `pkgs.aide` installed via `modules/system/security.nix`
-  - Daily check timer: `systemd.timers.aide-check` → `systemd.services.aide-check`
-  - Config at `/etc/aide.conf` (monitors `/boot`, `/etc`, `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, `/lib`, `/usr/lib`)
-  - Database: `/var/lib/aide/aide.db` — must be initialized manually after first boot
-  - Nix store explicitly excluded (`!/nix`) to avoid false positives
-
-**Audit:**
-- `security.auditd.enable = true` + `security.audit.enable = true` — system call auditing
-  - Logs to `/var/log/audit/audit.log`
-  - Rules monitor: `execve`, `openat`, `connect`, `setuid/setgid`, writes to `/etc/passwd`,
-    `/etc/shadow`, `/etc/sudoers`, `/etc/ssh/sshd_config`
-  - Configured in `modules/system/security.nix`
-
-**Security Audit Tool:**
-- Lynis — `pkgs.lynis` installed via `modules/system/security.nix`
-  - Manual only: `sudo lynis audit system`
-
 **Error Tracking:**
-- None (NixOS system config, not an application)
+- None — no external error tracking service
+
+**File Integrity (AIDE):**
+- Implementation: `modules/system/security.nix`
+- Tool: `pkgs.aide`
+- Schedule: daily systemd timer (`aide-check.timer`)
+- Config: `/etc/aide.conf` — monitors `/boot`, `/etc`, `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, `/lib`, `/usr/lib`; excludes `/nix`, `/var/log`, `/proc`, `/sys`, `/dev`, `/run`, `/tmp`
+- Results: journald (`journalctl -u aide-check`)
+- Database: `/var/lib/aide/aide.db`
+
+**System Call Auditing (auditd):**
+- Implementation: `modules/system/security.nix`
+- Service: `security.auditd.enable = true`
+- Rules: all `execve`, `openat`, `connect`, `setuid/setgid` syscalls; writes to `/etc/passwd`, `/etc/shadow`, `/etc/sudoers`, `/etc/ssh/sshd_config`
+- Output: `/var/log/audit/audit.log`
+
+**Antivirus (ClamAV):**
+- Implementation: `modules/system/security.nix`
+- Service: `services.clamav.daemon.enable = true` (clamd), `services.clamav.updater.enable = true` (freshclam)
+- Definition updates: 24 checks per day via freshclam
+
+**Hardening Auditor (lynis):**
+- Implementation: `modules/system/security.nix`
+- Tool: `pkgs.lynis` in `systemPackages`
+- Usage: manual — `sudo lynis audit system`
 
 **Logs:**
-- systemd journal (`journald`) — default NixOS logging
-- `/var/log` persisted via `@log` BTRFS subvolume (btrfs mode) or `environment.persistence` (full mode)
-
-## Network Services (Runtime)
-
-**SSH Tarpit:**
-- endlessh — `services.endlessh.enable = true` on port `22` (tarpitPort)
-  - Configured via `nerv.openssh.tarpitPort` option in `modules/services/openssh.nix`
-  - Firewall port opened automatically
-
-**Fail2ban:**
-- `services.fail2ban` — rate-limits and bans IPs after SSH brute force attempts
-  - Global: `maxretry = 5`, `bantime = 24h`
-  - SSHD jail: `maxretry = 3`, `findtime = 600s`, mode `aggressive`
-  - Exponential ban increase, max `168h` (1 week), across all jails
-  - Private subnets exempted: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
-  - Configured in `modules/services/openssh.nix`
-
-**mDNS / Avahi:**
-- `services.avahi.enable = true` — mDNS for network printer discovery (printing module) and
-  Bluetooth service advertisement (bluetooth module)
-- Configured in both `modules/services/printing.nix` and `modules/services/bluetooth.nix`
-
-**PipeWire / Audio:**
-- `services.pipewire` — local audio stack; no network integration beyond AirPlay RAOP sink
-  - AirPlay (RAOP): `libpipewire-module-raop-discover`; UDP 6001-6002 opened by `raopOpenFirewall = true`
-  - Configured in `modules/services/pipewire.nix`
-
-**CUPS Printing:**
-- `services.printing` — local CUPS daemon; discovers printers via Avahi/mDNS
-  - Driver: `gutenprint` (multi-brand)
-  - Configured in `modules/services/printing.nix`
-
-**NetworkManager:**
-- `networking.networkmanager.enable = true` — declared in `hosts/configuration.nix`
-  - `wheel` / `networkmanager` groups assigned to `nerv.primaryUser` entries via `modules/system/identity.nix`
-
-**Firmware Updates:**
-- `services.fwupd.enable = true` — pulls device firmware from Linux Vendor Firmware Service (LVFS)
-  - Applied manually: `fwupdmgr refresh && fwupdmgr upgrade`
-  - Configured in `modules/system/hardware.nix`
-
-**SSD TRIM:**
-- `services.fstrim.enable = true` — weekly TRIM via systemd timer
-  - Requires `allowDiscards = true` on the LUKS device (set in `modules/system/disko.nix`)
-  - Configured in `modules/system/hardware.nix`
+- systemd journal (`journald`) — primary log sink
+- `/var/log/audit/audit.log` — auditd syscall log
+- `/var/log` persisted by `@log` BTRFS subvolume (BTRFS layout) or `environment.persistence` (full/LVM layout)
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Self-hosted NixOS target machines — no cloud hosting
+- Self-hosted — NixOS machines; the library repo is cloned to `/etc/nixos` on each managed host
+
+**Auto-Upgrade:**
+- Implementation: `modules/system/nix.nix`
+- Service: `system.autoUpgrade.enable = true`
+- Schedule: daily (`system.autoUpgrade.dates = "daily"`)
+- Source: `flake = "/etc/nixos#host"` — pulls from the local flake at `/etc/nixos`
+- Reboot: `allowReboot = false` — upgrades stage but require manual reboot
 
 **CI Pipeline:**
-- None detected — no `.github/workflows/`, `.cirrus.yml`, or similar CI config
+- None — no remote CI; no GitHub Actions or other pipeline configuration detected
 
-**Auto-upgrade:**
-- `system.autoUpgrade` — daily pull from `/etc/nixos#host` flake, `allowReboot = false`
-  - Staged updates require manual reboot to activate
-  - Configured in `modules/system/nix.nix`
+**Version Control:**
+- Git — repository hosted at `github:atirelli3/NERV.nixos` (referenced in README installation instructions)
+- Install path: `/etc/nixos` (cloned directly on target machine; this path is persisted via `environment.persistence` in both impermanence modes)
 
 ## Webhooks & Callbacks
 
@@ -187,24 +137,55 @@ LVM layout (`nerv.disko.layout = "lvm"` — server):
 **Outgoing:**
 - None
 
+## Network Services
+
+**SSH Daemon (conditional on `nerv.openssh.enable`):**
+- Implementation: `modules/services/openssh.nix`
+- Port: `2222` (default; configurable via `nerv.openssh.port`)
+- Tarpit: `endlessh` on port `22` (default; wastes scanner connections with infinite banner)
+- Brute-force protection: `fail2ban` — 3 SSH failures in 10min → 24h ban; exponential growth capped at 168h; LAN subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) whitelisted
+
+**Audio — AirPlay Sink (conditional on `nerv.audio.enable`):**
+- Implementation: `modules/services/pipewire.nix`
+- Protocol: RAOP (AirPlay) via `libpipewire-module-raop-discover`
+- Firewall: `raopOpenFirewall = true` opens UDP 6001–6002 for discovery
+
+**Bluetooth (conditional on `nerv.bluetooth.enable`):**
+- Implementation: `modules/services/bluetooth.nix`
+- OBEX file transfer: auto-accept to `~/Downloads`
+- mDNS: `services.avahi.enable = true`
+- MPRIS proxy: `mpris-proxy` systemd user service for headset media buttons
+
+**Printing (conditional on `nerv.printing.enable`):**
+- Implementation: `modules/services/printing.nix`
+- Protocol: CUPS with network discovery via Avahi/mDNS (`nssmdns4 = true`)
+- Default driver: `gutenprint`
+
+**Firmware Updates (always on):**
+- Implementation: `modules/system/hardware.nix`
+- Service: `services.fwupd.enable = true` — LVFS firmware updates via `fwupdmgr`
+
+**SSD TRIM (always on):**
+- Implementation: `modules/system/hardware.nix`
+- Service: `services.fstrim` — weekly TRIM; requires `allowDiscards = true` on LUKS device
+
 ## Environment Configuration
 
-**Required host values (all `PLACEHOLDER` in `hosts/configuration.nix`):**
+**Required host values (no defaults):**
 - `nerv.hostname` — machine hostname
-- `nerv.primaryUser` — list of primary user names
-- `nerv.hardware.cpu` — `"amd"` | `"intel"` | `"other"`
-- `nerv.hardware.gpu` — `"amd"` | `"nvidia"` | `"intel"` | `"none"`
-- `nerv.locale.timeZone`, `nerv.locale.defaultLocale`, `nerv.locale.keyMap`
-- `disko.devices.disk.main.device` — block device path (e.g. `/dev/nvme0n1`)
 - `nerv.disko.layout` — `"btrfs"` | `"lvm"`
-- `nerv.disko.lvm.swapSize`, `nerv.disko.lvm.storeSize`, `nerv.disko.lvm.persistSize` (LVM only)
-
-**No `.env` files** — all configuration is declarative Nix; no runtime environment variables
+- `nerv.impermanence.mode` — `"btrfs"` | `"full"` (when `nerv.impermanence.enable = true`)
+- `disko.devices.disk.main.device` — disk device path
+- `nerv.hardware.cpu` — CPU vendor for microcode
+- `nerv.hardware.gpu` — GPU vendor for drivers
+- `nerv.locale.timeZone`, `nerv.locale.defaultLocale`, `nerv.locale.keyMap`
+- LVM only: `nerv.disko.lvm.swapSize`, `nerv.disko.lvm.storeSize`, `nerv.disko.lvm.persistSize`
 
 **Secrets location:**
-- LUKS passphrase: `/tmp/luks-password` — pre-seeded by install script, used only during `disko` run
-- SSH host keys: generated at first boot, persisted to `/persist/etc/ssh/`
-- Secure Boot PKI: generated by `sbctl`, stored at `/persist/var/lib/sbctl/`
+- LUKS password: `/tmp/luks-password` — exists only during installation (pre-seeded by install script, not committed)
+- SSH host keys: `/etc/ssh/ssh_host_*` — generated on first boot, persisted to `/persist` via `environment.persistence`
+- Secure Boot keys: `/var/lib/sbctl` — generated and enrolled by `sbctl` on first boot with `nerv.secureboot.enable = true`
+- No `.env` files exist in this repository
 
 ---
 

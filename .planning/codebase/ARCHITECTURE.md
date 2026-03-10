@@ -4,150 +4,151 @@
 
 ## Pattern Overview
 
-**Overall:** NixOS Flake Library — opinionated, profile-driven NixOS base configuration
+**Overall:** NixOS Library Flake — opinionated, reusable NixOS module collection ("base library") consumed by host flakes.
 
 **Key Characteristics:**
-- All configuration is expressed as NixOS modules under the `nerv.*` option namespace
-- Two deployment profiles (`hostProfile`, `serverProfile`) are defined in `flake.nix` as attribute sets and composed into `nixosConfigurations`
-- Every module defaults to off (`enable = false` or no default) — hosts opt-in via profiles; no implicit side-effects
-- Import order is significant in `modules/system/default.nix`: `secureboot.nix` must be last to apply `lib.mkForce false` on `systemd-boot` without priority conflicts
-- Overrides use `lib.mkForce` at the host level — no patching of library modules directly
+- All configuration is expressed as NixOS modules under a `nerv.*` option namespace
+- Options follow an opt-in/opt-out pattern: security-critical modules (kernel, security, nix daemon) are always-on and opaque; user-facing services are disabled by default and activated per-host via `nerv.<service>.enable`
+- The flake exports `nixosModules.default` (full suite) plus granular exports (`system`, `services`, `home`) so host flakes can include only the subset they need
+- No application code — this is purely declarative NixOS configuration in Nix language
+- A single reference `nixosConfigurations.host` is provided as a template/usage example; real hosts clone the repo and build against this flake
 
 ## Layers
 
-**Flake Layer:**
-- Purpose: Defines inputs, profiles, and `nixosConfigurations`. The single source of truth for which external inputs are pinned and how profiles compose modules.
+**Flake Entry Point:**
+- Purpose: Declares all external inputs (nixpkgs, lanzaboote, home-manager, disko, impermanence) and wires them together. Exposes `nixosModules` and one reference `nixosConfigurations.host`.
 - Location: `flake.nix`
-- Contains: Input declarations (`nixpkgs`, `lanzaboote`, `home-manager`, `disko`, `impermanence`), `hostProfile` attrset, `serverProfile` attrset, `nixosModules` exports, `nixosConfigurations.host` and `nixosConfigurations.server`
-- Depends on: All `modules/` subtrees, `home/`, `hosts/`
-- Used by: `nixos-rebuild`, `disko`, CI
+- Contains: Input pins, module exports, reference host configuration with annotated option defaults
+- Depends on: All upstream flake inputs
+- Used by: Host flakes that import `self.nixosModules.default` (or granular sub-modules)
 
-**Aggregator Layer:**
-- Purpose: Collects module subtrees into named exports. No logic of its own — pure `imports` lists.
-- Location: `modules/default.nix`, `modules/system/default.nix`, `modules/services/default.nix`
-- Contains: `{ imports = [ ... ]; }` only
-- Depends on: Individual module files
-- Used by: `flake.nix` via `self.nixosModules.default`
+**Top-Level Module Aggregator:**
+- Purpose: Single import that pulls in all three sub-trees (system, services, home). Host flakes only need to import this one file.
+- Location: `modules/default.nix`
+- Contains: `{ imports = [ ./system ./services ../home ]; }`
+- Depends on: `modules/system`, `modules/services`, `home`
+- Used by: `flake.nix` → `nixosModules.default`
 
-**System Module Layer:**
-- Purpose: OS-level concerns: disk layout, boot, kernel, hardware drivers, security hardening, identity, Nix daemon config, base packages, impermanence, and secure boot.
+**System Modules:**
+- Purpose: Low-level OS configuration — hardware, kernel, boot, disk layout, security, identity, Nix daemon. Mostly opaque (no `enable` toggle); they apply unconditionally when imported.
 - Location: `modules/system/`
 - Contains: `identity.nix`, `hardware.nix`, `kernel.nix`, `security.nix`, `nix.nix`, `packages.nix`, `boot.nix`, `impermanence.nix`, `disko.nix`, `secureboot.nix`
-- Depends on: `nixpkgs`, `lanzaboote` (secureboot), `disko` (disk layout), `impermanence` (bind mounts)
-- Used by: `modules/default.nix`
+- Depends on: nixpkgs, lanzaboote (secureboot), disko, impermanence (NixOS modules wired in the host flake)
+- Used by: `modules/system/default.nix` aggregator
 
-**Services Module Layer:**
-- Purpose: Opt-in user-facing services. All disabled by default; enabled via `nerv.<service>.enable = true` in a profile or host config.
+**Services Modules:**
+- Purpose: Optional user-facing services that extend the base system. All disabled by default (except `zsh`). Activated via `nerv.<service>.enable = true`.
 - Location: `modules/services/`
 - Contains: `openssh.nix`, `pipewire.nix`, `bluetooth.nix`, `printing.nix`, `zsh.nix`
-- Depends on: `nixpkgs`, inter-service soft coupling (`bluetooth.nix` uses `services.pipewire.wireplumber.extraConfig`)
-- Used by: `modules/default.nix`
+- Depends on: nixpkgs, `modules/system` (e.g. `zsh` reads `nerv.zsh.enable` that `identity.nix` consumes for shell assignment)
+- Used by: `modules/services/default.nix` aggregator
 
-**Home Manager Layer:**
-- Purpose: Wires `home-manager` as a NixOS module for each username listed in `nerv.home.users`. Does not own `~/home.nix` content — each user maintains their own.
+**Home Manager Integration:**
+- Purpose: Wires `home-manager` as a NixOS module for each username listed in `nerv.home.users`. Each user's personal config lives in their own `~/home.nix` (outside this repo boundary).
 - Location: `home/default.nix`
-- Contains: `nerv.home.enable`, `nerv.home.users` option; generates `home-manager.users` attrset
-- Depends on: `home-manager` flake input, `/home/<name>/home.nix` at runtime (outside flake boundary — requires `--impure`)
-- Used by: `modules/default.nix`
+- Contains: NixOS module that generates `home-manager.users` attrset from the `nerv.home.users` list; each entry imports `/home/<name>/home.nix` at build time (requires `--impure`)
+- Depends on: `home-manager` flake input, `osConfig.system.stateVersion`
+- Used by: `modules/default.nix` aggregator
 
-**Host Layer:**
-- Purpose: Machine-specific values only. Contains placeholders that must be filled before first boot.
+**Host Configuration:**
+- Purpose: Machine-specific overrides — hostname, locale, hardware identifiers, disk device path, feature flags. The only file that should differ per physical machine.
 - Location: `hosts/configuration.nix`, `hosts/hardware-configuration.nix`
-- Contains: `nerv.hostname`, `nerv.primaryUser`, `nerv.hardware.*`, `nerv.locale.*`, `system.stateVersion`, `disko.devices.disk.main.device`, `nerv.disko.layout`, `nerv.disko.lvm.*`
-- Depends on: `modules/` (all options declared there), `hosts/hardware-configuration.nix` (machine-generated)
-- Used by: `flake.nix` `nixosConfigurations.host` and `nixosConfigurations.server`
+- Contains: All `PLACEHOLDER` values that must be replaced before first boot; imports `hardware-configuration.nix` (generated by `nixos-generate-config` on the target)
+- Depends on: `modules/default.nix` (pulled in via flake wiring, not via explicit import here)
+- Used by: `nixosConfigurations.host` in `flake.nix`
 
 ## Data Flow
 
-**Configuration Evaluation:**
+**Option Resolution Flow:**
 
-1. `nixos-rebuild switch --flake /etc/nixos#host` is invoked
-2. Nix evaluates `flake.nix` outputs, resolving `nixosConfigurations.host`
-3. The module system merges: `lanzaboote`, `home-manager`, `impermanence`, `disko` external modules + `self.nixosModules.default` + `hostProfile` attrset + `hosts/configuration.nix`
-4. `modules/default.nix` pulls in `modules/system` + `modules/services` + `home/`
-5. `modules/system/default.nix` imports all system modules in order; option values from `hostProfile` + `hosts/configuration.nix` flow into each module's `config = lib.mkIf cfg.enable { ... }` block
-6. The final merged NixOS config is realised as a system closure
+1. Host flake (`flake.nix`) constructs a `nixosSystem` call combining: upstream module inputs (lanzaboote, home-manager, impermanence, disko), `self.nixosModules.default`, a Nix inline `host` attrset of `nerv.*` option values, and `./hosts/configuration.nix`
+2. NixOS module system merges all modules; `nerv.*` options declared in `modules/system/` and `modules/services/` become available
+3. Host's `configuration.nix` sets required values (`nerv.hostname`, `nerv.hardware.cpu`, `nerv.disko.layout`, etc.) and opt-in flags (`nerv.openssh.enable`, etc.)
+4. Each module's `config = lib.mkIf cfg.enable { ... }` body evaluates conditionally, producing NixOS config that feeds into the standard nixpkgs evaluation pipeline
+5. `nixos-rebuild switch --flake /etc/nixos#host` triggers the build and activation
 
-**Boot Sequence (btrfs profile):**
+**Disk Layout Branching Flow:**
 
-1. systemd stage 1 runs the `rollback` service (`modules/system/disko.nix`)
-2. The rollback service deletes `@`, snapshots `@root-blank` → `@`, giving a blank root
-3. LUKS container is unlocked (via passphrase or TPM2 if secureboot enabled)
-4. BTRFS subvolumes mount: `@` → `/`, `@home` → `/home`, `@nix` → `/nix`, `@persist` → `/persist`, `@log` → `/var/log`
-5. `impermanence` bind mounts overlay `/persist` paths over `/var/lib`, `/etc/nixos`, `/etc/machine-id`, SSH host keys
-6. Stage 2 systemd activates services
+1. `nerv.disko.layout` is set to `"btrfs"` (desktop/laptop) or `"lvm"` (server)
+2. `modules/system/disko.nix` uses `lib.mkIf isBtrfs` / `lib.mkIf isLvm` branches to emit the correct `disko.devices` attrset
+3. For `btrfs`: GPT → LUKS (`cryptroot`) → BTRFS with subvolumes `@`, `@root-blank`, `@home`, `@nix`, `@persist`, `@log`; initrd rollback service resets `@` to `@root-blank` on every boot
+4. For `lvm`: GPT → LUKS → LVM VG `lvmroot` → LVs `swap`, `store` (`/nix`), `persist` (`/persist`)
+5. `modules/system/impermanence.nix` reads the same `nerv.impermanence.mode` (`"btrfs"` or `"full"`) to decide whether to mount `/` as tmpfs (full mode) or rely on the BTRFS rollback service (btrfs mode)
 
-**Profile Selection:**
+**Secure Boot Flow:**
 
-- `hostProfile` enables: `nerv.openssh`, `nerv.audio`, `nerv.bluetooth`, `nerv.printing`, `nerv.impermanence` (mode = `btrfs`), `nerv.zsh`, `nerv.home`; sets `nerv.disko.layout = "btrfs"`
-- `serverProfile` enables: `nerv.openssh`, `nerv.impermanence` (mode = `full`), `nerv.zsh`; sets `nerv.disko.layout = "lvm"`
+1. `nerv.secureboot.enable = true` activates `modules/system/secureboot.nix` (must be last import — applies `lib.mkForce false` on systemd-boot)
+2. On first boot: `secureboot-enroll-keys.service` detects Setup Mode, calls `sbctl enroll-keys --microsoft`, sets sentinel file, triggers reboot
+3. On second boot: `secureboot-enroll-tpm2.service` verifies Secure Boot is enforcing, calls `systemd-cryptenroll` to bind LUKS to TPM2 PCRs 0+7
+4. Subsequent boots: TPM2 auto-unlocks the LUKS container without a passphrase prompt
+
+**State Management:**
+- Ephemeral state: everything on `/` (btrfs mode) or tmpfs `/` (full mode) — wiped on reboot
+- Persistent state: `/persist` subvolume (`@persist`) or ext4 LV, bind-mounted via `environment.persistence` from the `impermanence` module
+- Nix store: `/nix` on dedicated subvolume `@nix` or LV `store` — never wiped
+- Logs: `/var/log` on dedicated BTRFS subvolume `@log` (btrfs mode only) — never wiped, not in `environment.persistence` to avoid double-mount
 
 ## Key Abstractions
 
 **`nerv.*` Option Namespace:**
-- Purpose: All library-provided options are scoped under `nerv.` to avoid collisions with upstream NixOS options. Every module declares its own `options.nerv.<name>` block.
-- Examples: `modules/system/identity.nix`, `modules/system/disko.nix`, `modules/services/openssh.nix`
-- Pattern: `options.nerv.<module> = { enable = lib.mkEnableOption "..."; ... };` followed by `config = lib.mkIf cfg.enable { ... };`
+- Purpose: All NERV-specific options live under this single namespace, preventing collisions with upstream NixOS options. Each module declares its own `options.nerv.<module>` subtree.
+- Examples: `modules/system/identity.nix` (`nerv.hostname`, `nerv.locale.*`, `nerv.primaryUser`), `modules/system/hardware.nix` (`nerv.hardware.cpu`, `nerv.hardware.gpu`), `modules/services/openssh.nix` (`nerv.openssh.*`)
+- Pattern: `options.nerv.<name> = { enable = lib.mkEnableOption ...; <sub-options> ... };` followed by `config = lib.mkIf cfg.enable { ... };`
 
-**Profiles (attrsets in `flake.nix`):**
-- Purpose: Pre-configured bundles of `nerv.*` option assignments for common deployment types. Passed as a module directly to `nixosConfigurations`.
-- Examples: `hostProfile`, `serverProfile` in `flake.nix` (lines 35–62)
-- Pattern: Plain Nix attrset of `nerv.<option> = <value>` pairs — no module boilerplate required
+**Aggregator `default.nix` Files:**
+- Purpose: Each directory has a `default.nix` that is a pure `{ imports = [...]; }` list — no logic. This keeps the import graph flat and readable.
+- Examples: `modules/default.nix`, `modules/system/default.nix`, `modules/services/default.nix`
+- Pattern: `{ imports = [ ./a.nix ./b.nix ... ]; }` — no `config`, no `options`
 
-**Conditional Disk Layout (`nerv.disko.layout`):**
-- Purpose: A single `disko.nix` module supports two disk topologies (BTRFS subvolumes for desktop, LVM LVs for server) controlled by an enum option.
-- Examples: `modules/system/disko.nix` — `lib.mkIf isBtrfs { ... }` and `lib.mkIf isLvm { ... }` branches
-- Pattern: `lib.mkMerge [ (lib.mkIf condA { ... }) (lib.mkIf condB { ... }) shared ]`
+**Shared Disko Fragments:**
+- Purpose: `sharedEsp` (1G vfat `/boot`) and `sharedLuksOuter` (LUKS wrapper) are let-bindings in `disko.nix` reused by both the btrfs and lvm branches to avoid duplication.
+- Examples: `modules/system/disko.nix` (lines 12–34)
+- Pattern: Nix let-bindings return attrsets consumed inline in `lib.mkIf` branches
 
-**Impermanence Modes:**
-- Purpose: Two strategies for ephemeral root — `btrfs` mode uses BTRFS rollback snapshot; `full` mode mounts `/` as tmpfs. Both use `environment.persistence` from the `impermanence` module for bind mounts from `/persist`.
-- Examples: `modules/system/impermanence.nix` lines 105–177
-- Pattern: `lib.mkIf (cfg.mode == "btrfs") { ... }` / `lib.mkIf (cfg.mode == "full") { ... }`
-
-**`lib.mkForce` Escape Hatch:**
-- Purpose: Every opaque module documents that host-level overrides use `lib.mkForce`. No module exposes every tunable as an option — only the meaningful dials.
-- Examples: `modules/system/boot.nix`, `modules/system/security.nix`, `modules/system/nix.nix`
-- Pattern: Documented in each file header: `Override: lib.mkForce at the host level.`
+**Import-Order-Sensitive Module:**
+- Purpose: `secureboot.nix` uses `lib.mkForce false` to disable systemd-boot after `boot.nix` enables it. The `system/default.nix` explicitly comments that secureboot must be last in the imports list.
+- Examples: `modules/system/default.nix` (import order), `modules/system/secureboot.nix` (line 15)
+- Pattern: `boot.loader.systemd-boot.enable = lib.mkForce false;` overrides the earlier `= true` in `boot.nix`
 
 ## Entry Points
 
-**`flake.nix`:**
+**Flake:**
 - Location: `flake.nix`
-- Triggers: `nixos-rebuild`, `nix flake check`, `disko` disk formatting
-- Responsibilities: Pins all inputs, defines profiles, exposes `nixosModules` and `nixosConfigurations`
+- Triggers: `nix flake` commands; `nixos-rebuild` with `--flake /etc/nixos#host`
+- Responsibilities: Pins all inputs, exports `nixosModules`, defines the reference `nixosConfigurations.host`
 
-**`hosts/configuration.nix`:**
+**Module Root:**
+- Location: `modules/default.nix`
+- Triggers: Imported by host flakes as `self.nixosModules.default`
+- Responsibilities: Aggregates all three sub-trees into a single import
+
+**Host Configuration:**
 - Location: `hosts/configuration.nix`
-- Triggers: Included in every `nixosConfigurations.*` modules list
-- Responsibilities: Declares machine identity (`nerv.hostname`, `nerv.primaryUser`, `nerv.hardware.*`, `nerv.locale.*`, `system.stateVersion`, `disko.devices.disk.main.device`, LVM sizes). All values are `PLACEHOLDER` until the operator fills them in.
+- Triggers: Included in `nixosConfigurations.host` module list in `flake.nix`
+- Responsibilities: Provides machine-specific values for all `nerv.*` options that have no default (hostname, hardware, disk device, layout); also declares the system user and `system.stateVersion`
 
-**`hosts/hardware-configuration.nix`:**
+**Hardware Configuration:**
 - Location: `hosts/hardware-configuration.nix`
 - Triggers: Imported by `hosts/configuration.nix`
-- Responsibilities: Placeholder — replaced per-machine with `nixos-generate-config --show-hardware-config` output
-
-**`modules/default.nix`:**
-- Location: `modules/default.nix`
-- Triggers: Imported as `self.nixosModules.default` from `flake.nix`
-- Responsibilities: Aggregates `modules/system`, `modules/services`, `home/` into a single NixOS module
+- Responsibilities: Machine-specific kernel modules and file systems generated by `nixos-generate-config --show-hardware-config`; currently a stub placeholder
 
 ## Error Handling
 
-**Strategy:** NixOS module system assertions — build-time failures, not runtime panics.
+**Strategy:** Nix `assertions` for hard failures that would brick the system; `warnings` for soft issues recoverable after the fact.
 
 **Patterns:**
-- Hard assertions (`assertions = [{ assertion = ...; message = ...; }]`) for invariants that would cause unrecoverable boot failures (e.g., `nerv.hostname` must not be empty; `nerv.openssh.tarpitPort != port`; `/var/lib/sbctl` must not be in `impermanence.extraDirs` when secureboot is enabled)
-- Soft warnings (`warnings = lib.optionals ...`) for recoverable risks (e.g., sbctl not covered by persistence in btrfs mode — keys are lost on rollback but re-enrollment is possible)
-- `lib.mkEnableOption` defaults every service to disabled — missing declarations are safe (off), not broken (error)
-- Intentional no-default on `nerv.disko.layout`, `nerv.impermanence.mode`, and `nerv.hostname` — forces explicit operator declaration; a missing value is a build-time type error
+- Hard assertion in `identity.nix`: `nerv.hostname` must not be empty string (prevents building a nameless machine)
+- Hard assertion in `openssh.nix`: `tarpitPort` must differ from `port` (prevents SSH daemon and tarpit from colliding)
+- Hard assertion in `impermanence.nix` (IMPL-02): when secureboot is enabled, `/var/lib/sbctl` must not be in any tmpfs mount path (wiping sbctl keys on every reboot is non-recoverable)
+- Soft warning in `impermanence.nix` (btrfs mode): when secureboot is enabled and `/var/lib/sbctl` is not covered by `environment.persistence`, `lib.warn` fires (recoverable via re-enrollment, so no hard failure)
 
 ## Cross-Cutting Concerns
 
-**Logging:** No custom logging framework. System journals via systemd. Security events via `auditd` (all process executions, file opens, network connections, privilege escalation). AIDE runs daily and logs to `journalctl -u aide-check`.
+**Logging:** No custom logging layer — all services log to the systemd journal. Audit logging via `security.auditd` configured in `modules/system/security.nix`; AIDE daily integrity check logs to journal unit `aide-check`.
 
-**Validation:** NixOS module system type-checking (`lib.types.enum`, `lib.types.str`, `lib.types.listOf`, `lib.types.port`) plus explicit `assertions` blocks in modules that have non-trivial invariants.
+**Validation:** Via NixOS `assertions` (list of `{ assertion = bool; message = str; }`) evaluated at build time. No runtime validation layer.
 
-**Authentication:** SSH key-based only by default (`passwordAuth = false`, `kbdInteractiveAuth = false`). Root login always disabled. Wheel group is the only privilege escalation path (`security.sudo.execWheelOnly = true`). LUKS full-disk encryption on all layouts. Optional TPM2 auto-unlock bound to Secure Boot PCRs 0+7 via `nerv.secureboot.enable`.
+**Authentication:** SSH key-based only by default (`openssh.nix`). `sudo` restricted to wheel group (`security.nix`). Nix daemon accessible only to wheel group (`nix.nix`). Root SSH login disabled unconditionally.
 
 ---
 
