@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Phase 12 context gathered
-last_updated: "2026-03-10T09:39:54.210Z"
+stopped_at: Completed 12-profile-wiring-and-documentation-01-PLAN.md
+last_updated: "2026-03-10T10:04:03.778Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 12
   completed_phases: 11
-  total_plans: 28
-  completed_plans: 28
+  total_plans: 31
+  completed_plans: 30
   percent: 0
 ---
 
@@ -82,6 +82,8 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 10-initrd-btrfs-rollback-service P01 | 2 | 2 tasks | 2 files |
 | Phase 10-initrd-btrfs-rollback-service P02 | 2 | 2 tasks | 2 files |
 | Phase 11-impermanence-btrfs-mode P01 | 3 | 2 tasks | 1 files |
+| Phase 12-profile-wiring-and-documentation P01 | 1 | 1 tasks | 1 files |
+| Phase 12-profile-wiring-and-documentation P02 | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -168,6 +170,7 @@ Recent decisions affecting current work:
 - [Phase 11-impermanence-btrfs-mode]: mode enum is [btrfs, full] with NO default — forces explicit declaration per host (consistent with nerv.hostname, nerv.disko.layout)
 - [Phase 11-impermanence-btrfs-mode]: /var/lib persisted as single broad directory in btrfs mode — covers all service state (nixos, systemd, sbctl, BT, NM, cups); /var/log excluded (handled by @log BTRFS subvolume in disko.nix, double-mount conflict otherwise)
 - [Phase 11-impermanence-btrfs-mode]: sbctl warning in btrfs block uses static persistDirs list to avoid self-reference cycle; warning (not assertion) preserves nix flake check during multi-step migrations
+- [Phase 12-profile-wiring-and-documentation]: nerv.disko.layout placed as first attribute in each profile block; vmProfile and nixosConfigurations.vm deleted cleanly (no stubs) per CONTEXT.md locked decision
 
 ### v2.0 Decisions (pre-phase)
 
@@ -191,7 +194,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-10T09:39:54.207Z
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-profile-wiring-and-documentation/12-CONTEXT.md
+Last session: 2026-03-10T10:03:56.021Z
+Stopped at: Completed 12-profile-wiring-and-documentation-01-PLAN.md
+Resume file: None
 Next action: /gsd:plan-phase 9
