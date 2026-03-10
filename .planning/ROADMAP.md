@@ -247,5 +247,5 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 8. NERV.nixos Release & Multi-Profile Migration | 4/4 | Complete | 2026-03-08 |
 | 9. BTRFS Disko Layout | 2/2 | Complete   | 2026-03-09 |
 | 10. initrd BTRFS Rollback Service | 2/2 | Complete    | 2026-03-10 |
-| 11. Impermanence BTRFS Mode | 1/1 | Complete   | 2026-03-10 |
+| 11. Impermanence BTRFS Mode | 1/1 | Complete    | 2026-03-10 |
 | 12. Profile Wiring and Documentation | 0/TBD | Not started | - |
