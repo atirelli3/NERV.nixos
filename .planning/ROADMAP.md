@@ -27,7 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **v2.0 Phases (Current Milestone):**
 - [x] **Phase 9: BTRFS Disko Layout** - Add nerv.disko.layout option to disko.nix with BTRFS subvolume branch and explicit LVM option (completed 2026-03-09)
 - [x] **Phase 10: initrd BTRFS Rollback Service** - Wire btrfs-progs into initrd and add systemd rollback service that resets root on every boot (completed 2026-03-10)
-- [ ] **Phase 11: Impermanence BTRFS Mode** - Add nerv.impermanence.mode = "btrfs" path with explicit persistence rules and neededForBoot on /persist
+- [x] **Phase 11: Impermanence BTRFS Mode** - Add nerv.impermanence.mode = "btrfs" path with explicit persistence rules and neededForBoot on /persist (completed 2026-03-10)
 - [ ] **Phase 12: Profile Wiring and Documentation** - Wire layout/mode options into all profiles, update module section-headers, document install procedure
 
 ## Phase Details
@@ -247,5 +247,5 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 8. NERV.nixos Release & Multi-Profile Migration | 4/4 | Complete | 2026-03-08 |
 | 9. BTRFS Disko Layout | 2/2 | Complete   | 2026-03-09 |
 | 10. initrd BTRFS Rollback Service | 2/2 | Complete    | 2026-03-10 |
-| 11. Impermanence BTRFS Mode | 0/1 | Not started | - |
+| 11. Impermanence BTRFS Mode | 1/1 | Complete   | 2026-03-10 |
 | 12. Profile Wiring and Documentation | 0/TBD | Not started | - |

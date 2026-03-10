@@ -55,8 +55,8 @@
 
 ### Persistence (PERSIST)
 
-- [ ] **PERSIST-01**: `nerv.impermanence.mode = "btrfs"` activates `environment.persistence."/persist"` without a tmpfs `/` (rollback resets root); persistence rules declare machine-id, SSH host keys, `/var/lib/nixos`, `/var/lib/systemd`, `/etc/nixos` — `/var/log` is excluded (persisted via @log subvolume, not bind-mount)
-- [ ] **PERSIST-02**: `/persist` (the @persist subvolume) has `neededForBoot = true` when mode = "btrfs" so upstream impermanence bind-mounts are available before services start
+- [x] **PERSIST-01**: `nerv.impermanence.mode = "btrfs"` activates `environment.persistence."/persist"` without a tmpfs `/` (rollback resets root); persistence rules declare machine-id, SSH host keys, `/var/lib/nixos`, `/var/lib/systemd`, `/etc/nixos` — `/var/log` is excluded (persisted via @log subvolume, not bind-mount)
+- [x] **PERSIST-02**: `/persist` (the @persist subvolume) has `neededForBoot = true` when mode = "btrfs" so upstream impermanence bind-mounts are available before services start
 
 ### Profiles & Documentation (PROF)
 
@@ -121,8 +121,8 @@
 | BOOT-01 | Phase 10 | Complete |
 | BOOT-02 | Phase 10 | Complete |
 | BOOT-03 | Phase 10 | Complete |
-| PERSIST-01 | Phase 11 | Pending |
-| PERSIST-02 | Phase 11 | Pending |
+| PERSIST-01 | Phase 11 | Complete |
+| PERSIST-02 | Phase 11 | Complete |
 | PROF-01 | Phase 12 | Pending |
 | PROF-02 | Phase 12 | Pending |
 | PROF-03 | Phase 12 | Pending |

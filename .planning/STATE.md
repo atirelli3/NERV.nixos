@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Phase 11 context gathered
-last_updated: "2026-03-10T08:41:54.222Z"
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-03-10T09:05:54.987Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 12
-  completed_phases: 10
-  total_plans: 27
-  completed_plans: 27
+  completed_phases: 11
+  total_plans: 28
+  completed_plans: 28
   percent: 0
 ---
 
@@ -81,6 +81,7 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 09-btrfs-disko-layout P02 | 1 | 2 tasks | 1 files |
 | Phase 10-initrd-btrfs-rollback-service P01 | 2 | 2 tasks | 2 files |
 | Phase 10-initrd-btrfs-rollback-service P02 | 2 | 2 tasks | 2 files |
+| Phase 11-impermanence-btrfs-mode P01 | 3 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,9 @@ Recent decisions affecting current work:
 - [Phase 10-initrd-btrfs-rollback-service]: disko.nix header expanded: Purpose documents layout-conditional initrd per branch; Options lists boot.initrd.* additions; LUKS section references secureboot.nix only with @root-blank install instruction
 - [Phase 10-initrd-btrfs-rollback-service]: boot.nix LUKS section removed from header — LUKS no longer declared in boot.nix; retaining the sync comment would mislead operators
 - [Phase 10-initrd-btrfs-rollback-service]: @root-blank install instruction placed in disko.nix LUKS header section — install procedure documentation travels with the code that declares @root-blank
+- [Phase 11-impermanence-btrfs-mode]: mode enum is [btrfs, full] with NO default — forces explicit declaration per host (consistent with nerv.hostname, nerv.disko.layout)
+- [Phase 11-impermanence-btrfs-mode]: /var/lib persisted as single broad directory in btrfs mode — covers all service state (nixos, systemd, sbctl, BT, NM, cups); /var/log excluded (handled by @log BTRFS subvolume in disko.nix, double-mount conflict otherwise)
+- [Phase 11-impermanence-btrfs-mode]: sbctl warning in btrfs block uses static persistDirs list to avoid self-reference cycle; warning (not assertion) preserves nix flake check during multi-step migrations
 
 ### v2.0 Decisions (pre-phase)
 
@@ -187,7 +191,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-10T08:41:54.219Z
-Stopped at: Phase 11 context gathered
-Resume file: .planning/phases/11-impermanence-btrfs-mode/11-CONTEXT.md
+Last session: 2026-03-10T09:05:54.984Z
+Stopped at: Completed 11-01-PLAN.md
+Resume file: None
 Next action: /gsd:plan-phase 9
