@@ -1,197 +1,211 @@
 # External Integrations
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-10
 
-## Overview
+## Upstream Nix Flake Inputs
 
-NERV.nixos is a NixOS system configuration library. It has **no application-level external API integrations** (no HTTP clients, no SaaS SDKs, no webhook endpoints). All "integrations" are at the OS services layer — system daemons, hardware interfaces, and network protocols managed by NixOS modules.
+These are the only external dependencies. All are fetched by Nix at build/eval time — no runtime
+network calls from the system configuration itself.
 
----
+**NixOS Package Set:**
+- `nixpkgs` — `github:NixOS/nixpkgs/nixos-unstable`
+  - Auth: none (public GitHub)
+  - Role: base package set for all `pkgs.*` and `lib.*` usage across every module
 
-## OS Services & Daemons
+**Disk Layout:**
+- `disko` — `github:nix-community/disko/v1.13.0` (pinned by tag)
+  - Follows: `nixpkgs`
+  - Role: `disko.nixosModules.disko` — declarative GPT/LUKS partitioning in `modules/system/disko.nix`
 
-**OpenSSH (modules/services/openssh.nix):**
-- Daemon: `services.openssh` — SSH server on configurable port (default: 2222)
-- Key-based auth only by default (`PasswordAuthentication = false`)
-- Root login disabled (`PermitRootLogin = "no"`)
-- Config option: `nerv.openssh.port`, `nerv.openssh.allowUsers`
+**Impermanence:**
+- `impermanence` — `github:nix-community/impermanence` (HEAD, no nixpkgs input — no follows)
+  - Role: `impermanence.nixosModules.impermanence` — `environment.persistence` bind-mounts in
+    `modules/system/impermanence.nix`
 
-**endlessh tarpit (modules/services/openssh.nix):**
-- Daemon: `services.endlessh` — SSH tarpit bound to port 22 by default
-- Wastes bot connections with an infinitely slow SSH banner
-- Config option: `nerv.openssh.tarpitPort` (default: 22)
+**Home Manager:**
+- `home-manager` — `github:nix-community/home-manager`
+  - Follows: `nixpkgs`
+  - Role: `home-manager.nixosModules.home-manager` — user dotfile management wired in `home/default.nix`
 
-**fail2ban (modules/services/openssh.nix):**
-- Daemon: `services.fail2ban` — IP ban after repeated SSH failures
-- Ban time: 24h, maxretry: 3 for SSH jail, exponential bantime-increment enabled
-- LAN subnets excluded: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
-- Mode: `aggressive` (catches probes for invalid users)
-
-**PipeWire (modules/services/pipewire.nix):**
-- Daemon: `services.pipewire` — audio stack replacing PulseAudio
-- ALSA compat: enabled (including 32-bit support for Steam/Wine)
-- PulseAudio compat layer: enabled
-- AirPlay sink: `libpipewire-module-raop-discover` — streams audio to RAOP receivers on LAN (UDP 6001-6002 opened)
-- rtkit for realtime scheduling priority
-- Low-latency defaults: 1024/48000 (~21ms quantum)
-
-**Bluetooth (modules/services/bluetooth.nix):**
-- Daemon: `hardware.bluetooth` via BlueZ
-- GUI: `services.blueman` — GTK pairing manager
-- mDNS advertisement: `services.avahi`
-- WirePlumber config: SBC-XQ, mSBC, HSP/HFP roles enabled; auto-switch to headset profile disabled
-- OBEX file transfer: `obexd --root=%h/Downloads --auto-accept` (user systemd service)
-- MPRIS proxy: `mpris-proxy` user service (forwards headset media buttons to players)
-
-**CUPS Printing (modules/services/printing.nix):**
-- Daemon: `services.printing` — CUPS with `gutenprint` driver package
-- Network discovery: `services.avahi` with `nssmdns4 = true` (.local hostname resolution)
-
-**ClamAV (modules/system/security.nix):**
-- Daemon: `services.clamav.daemon` (clamd) — real-time antivirus scanning
-- Updater: `services.clamav.updater` (freshclam) — 24 definition update checks per day
-
-**fwupd (modules/system/hardware.nix):**
-- Daemon: `services.fwupd` — firmware updates via LVFS (Linux Vendor Firmware Service)
-- Updates applied with: `fwupdmgr refresh && fwupdmgr upgrade`
-
-**fstrim (modules/system/hardware.nix):**
-- Timer: `services.fstrim` — weekly SSD TRIM
-- Requires LUKS `allowDiscards = true` (set in `modules/system/boot.nix`)
-
----
-
-## Security Services
-
-**AppArmor (modules/system/security.nix):**
-- `security.apparmor.enable = true` — Mandatory Access Control
-- Confinement opt-in by default; strict mode available via `killUnconfinedConfinables`
-
-**auditd (modules/system/security.nix):**
-- `security.auditd.enable = true` — kernel syscall auditing
-- Audit rules: `execve`, `openat`, `connect`, `setuid/setgid`, writes to `/etc/passwd`, `/etc/shadow`, `/etc/sudoers`, `/etc/ssh/sshd_config`
-- Logs to `/var/log/audit/audit.log`
-
-**AIDE (modules/system/security.nix):**
-- Package: `pkgs.aide` — file integrity monitor
-- Monitored paths: `/boot /etc /bin /sbin /usr/bin /usr/sbin /lib /usr/lib`
-- Daily check via `systemd.timers.aide-check` → `systemd.services.aide-check`
-- Database: `/var/lib/aide/aide.db` (must be initialized manually post-install)
-
-**TPM2 (modules/system/secureboot.nix):**
-- `security.tpm2` with PKCS#11 and TCTI environment — only active when `nerv.secureboot.enable = true`
-- Used for LUKS auto-unlock sealed to Secure Boot state (PCR 0+7)
-
----
-
-## Secure Boot
-
-**Lanzaboote (modules/system/secureboot.nix):**
-- Input: `github:nix-community/lanzaboote`
-- Replaces systemd-boot when `nerv.secureboot.enable = true`
-- PKI bundle: `/var/lib/sbctl`
-- Tooling: `sbctl` (key management), `tpm2-tss`, `tpm2-tools`
-- Two-boot first-time enrollment sequence managed by `secureboot-enroll-keys.service` and `secureboot-enroll-tpm2.service`
-
----
-
-## Network Protocols
-
-| Protocol | Module | Purpose |
-|---|---|---|
-| SSH (port 2222 default) | `modules/services/openssh.nix` | Remote access |
-| SSH tarpit (port 22 default) | `modules/services/openssh.nix` | Bot deterrent |
-| mDNS / Avahi | `modules/services/bluetooth.nix`, `modules/services/printing.nix` | Local service discovery |
-| RAOP / AirPlay (UDP 6001-6002) | `modules/services/pipewire.nix` | Audio streaming to LAN receivers |
-| OBEX | `modules/services/bluetooth.nix` | Bluetooth file transfer |
-
----
-
-## Hardware Interfaces
-
-**CPU microcode (modules/system/hardware.nix):**
-- AMD: `hardware.cpu.amd.updateMicrocode = true` + `amd_iommu=on iommu=pt`
-- Intel: `hardware.cpu.intel.updateMicrocode = true` + `intel_iommu=on iommu=pt`
-- Selected by `nerv.hardware.cpu` option
-
-**GPU drivers (modules/system/hardware.nix):**
-- NVIDIA: `xserver.videoDrivers = ["nvidia"]`, `hardware.nvidia.open = true` (Turing+/RTX 20xx+)
-- AMD: `xserver.videoDrivers = ["amdgpu"]`
-- Intel: `xserver.videoDrivers = ["intel"]`
-- Selected by `nerv.hardware.gpu` option
-
-**Firmware (modules/system/hardware.nix):**
-- `hardware.enableRedistributableFirmware = true`
-- `hardware.enableAllFirmware = true` (Wi-Fi, BT, GPU firmware blobs; requires `allowUnfree = true`)
-
----
+**Secure Boot:**
+- `lanzaboote` — `github:nix-community/lanzaboote`
+  - Follows: `nixpkgs`
+  - Role: `lanzaboote.nixosModules.lanzaboote` — replaces systemd-boot when `nerv.secureboot.enable = true`;
+    configured in `modules/system/secureboot.nix`
 
 ## Data Storage
 
-**Disk Layout (hosts/disko-configuration.nix):**
-- Partitioning: GPT / EFI (1G, FAT32, label `NIXBOOT`) + LUKS (label `NIXLUKS`)
-- LVM volumes: `swap` (NIXSWAP), `store` (NIXSTORE, ext4, `/nix`), `persist` (NIXPERSIST, ext4, `/persist`)
-- Root `/` is NOT a persistent volume — it is a `tmpfs` in full-impermanence mode
+**Databases:**
+- None — this is a NixOS configuration library, not an application
 
-**Persistent State (modules/system/impermanence.nix — full mode):**
-- `/var/log`, `/var/lib/nixos`, `/var/lib/systemd`, `/etc/nixos` — persisted directories
-- `/etc/machine-id`, SSH host keys (`ed25519` and `rsa`) — persisted files
+**Filesystem layouts (target machine, declared in `modules/system/disko.nix`):**
 
-**tmpfs (modules/system/impermanence.nix):**
-- Minimal mode: `/tmp` and `/var/tmp` as tmpfs (25% RAM, `nosuid nodev`)
-- Full mode: additionally `/` as tmpfs (2G limit)
-- Optional per-user and extra-dir tmpfs mounts configurable via `nerv.impermanence.users` and `nerv.impermanence.extraDirs`
+BTRFS layout (`nerv.disko.layout = "btrfs"` — desktop/laptop):
+- `/boot` — vfat, label `NIXBOOT`, 1G ESP
+- LUKS container — label `NIXLUKS`, TRIM enabled
+- BTRFS pool — label `NIXBTRFS`, subvolumes:
+  - `/@` → `/` (compress=zstd:3)
+  - `/@root-blank` → no mountpoint (rollback baseline)
+  - `/@home` → `/home`
+  - `/@nix` → `/nix`
+  - `/@persist` → `/persist`
+  - `/@log` → `/var/log`
 
----
+LVM layout (`nerv.disko.layout = "lvm"` — server):
+- `/boot` — vfat, label `NIXBOOT`, 1G ESP
+- LUKS container — label `NIXLUKS`, TRIM enabled
+- LVM VG `lvmroot` with LVs:
+  - `swap` — label `NIXSWAP`
+  - `store` → `/nix` — ext4, label `NIXSTORE`
+  - `persist` → `/persist` — ext4, label `NIXPERSIST`
+
+**File Storage:**
+- Local filesystem only — no cloud storage integration
+
+**Caching:**
+- Nix binary cache — default `cache.nixos.org` (built into nixpkgs, not configured explicitly here)
+- No application-level caching
 
 ## Authentication & Identity
 
-**SSH Auth:**
-- Key-based only by default; password auth and keyboard-interactive auth disabled
-- `PermitRootLogin = "no"` enforced
-- Optional user allowlist via `nerv.openssh.allowUsers`
+**SSH (when `nerv.openssh.enable = true`):**
+- Implementation: `modules/services/openssh.nix`
+- Key-based auth only by default (`PasswordAuthentication = false`, `KbdInteractiveAuth = false`)
+- SSH daemon on non-standard port (default `2222`); port `22` reserved for endlessh tarpit
+- Host keys persisted to `/persist` via `environment.persistence` in `modules/system/impermanence.nix`:
+  - `/etc/ssh/ssh_host_ed25519_key` + `.pub`
+  - `/etc/ssh/ssh_host_rsa_key` + `.pub`
+- Machine identity: `/etc/machine-id` persisted to `/persist`
 
-**Sudo:**
-- `security.sudo.execWheelOnly = true` — only wheel-group members via setuid wrapper
-- Primary users auto-added to `wheel` and `networkmanager` groups by `modules/system/identity.nix`
+**Secure Boot / LUKS (when `nerv.secureboot.enable = true`):**
+- Implementation: `modules/system/secureboot.nix`
+- Lanzaboote — PKI bundle at `/var/lib/sbctl` (persisted via `environment.persistence`)
+- TPM2 LUKS auto-unlock — sealed to PCRs `0+7` via `systemd-cryptenroll`
+- First-boot automation: two-phase systemd services:
+  - `secureboot-enroll-keys.service` — enrolls SB keys and reboots
+  - `secureboot-enroll-tpm2.service` — binds LUKS to TPM2 on second boot
+- Re-enrollment helper: `luks-cryptenroll` script placed in `environment.systemPackages`
+- No external auth provider — all local/TPM2
 
-**Local User Auth:**
-- Standard Linux PAM (NixOS defaults)
-- No external identity provider (no LDAP, no SSO, no OAuth)
+**sudo:**
+- `security.sudo.execWheelOnly = true` — only `wheel` group members may use sudo (`modules/system/security.nix`)
 
----
+## Monitoring & Observability
+
+**Antivirus:**
+- ClamAV — `services.clamav.daemon.enable = true`, `services.clamav.updater.enable = true`
+  - Definition updates: 24 checks/day via `freshclam`
+  - Configured in `modules/system/security.nix`
+
+**File Integrity:**
+- AIDE — `pkgs.aide` installed via `modules/system/security.nix`
+  - Daily check timer: `systemd.timers.aide-check` → `systemd.services.aide-check`
+  - Config at `/etc/aide.conf` (monitors `/boot`, `/etc`, `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, `/lib`, `/usr/lib`)
+  - Database: `/var/lib/aide/aide.db` — must be initialized manually after first boot
+  - Nix store explicitly excluded (`!/nix`) to avoid false positives
+
+**Audit:**
+- `security.auditd.enable = true` + `security.audit.enable = true` — system call auditing
+  - Logs to `/var/log/audit/audit.log`
+  - Rules monitor: `execve`, `openat`, `connect`, `setuid/setgid`, writes to `/etc/passwd`,
+    `/etc/shadow`, `/etc/sudoers`, `/etc/ssh/sshd_config`
+  - Configured in `modules/system/security.nix`
+
+**Security Audit Tool:**
+- Lynis — `pkgs.lynis` installed via `modules/system/security.nix`
+  - Manual only: `sudo lynis audit system`
+
+**Error Tracking:**
+- None (NixOS system config, not an application)
+
+**Logs:**
+- systemd journal (`journald`) — default NixOS logging
+- `/var/log` persisted via `@log` BTRFS subvolume (btrfs mode) or `environment.persistence` (full mode)
+
+## Network Services (Runtime)
+
+**SSH Tarpit:**
+- endlessh — `services.endlessh.enable = true` on port `22` (tarpitPort)
+  - Configured via `nerv.openssh.tarpitPort` option in `modules/services/openssh.nix`
+  - Firewall port opened automatically
+
+**Fail2ban:**
+- `services.fail2ban` — rate-limits and bans IPs after SSH brute force attempts
+  - Global: `maxretry = 5`, `bantime = 24h`
+  - SSHD jail: `maxretry = 3`, `findtime = 600s`, mode `aggressive`
+  - Exponential ban increase, max `168h` (1 week), across all jails
+  - Private subnets exempted: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`
+  - Configured in `modules/services/openssh.nix`
+
+**mDNS / Avahi:**
+- `services.avahi.enable = true` — mDNS for network printer discovery (printing module) and
+  Bluetooth service advertisement (bluetooth module)
+- Configured in both `modules/services/printing.nix` and `modules/services/bluetooth.nix`
+
+**PipeWire / Audio:**
+- `services.pipewire` — local audio stack; no network integration beyond AirPlay RAOP sink
+  - AirPlay (RAOP): `libpipewire-module-raop-discover`; UDP 6001-6002 opened by `raopOpenFirewall = true`
+  - Configured in `modules/services/pipewire.nix`
+
+**CUPS Printing:**
+- `services.printing` — local CUPS daemon; discovers printers via Avahi/mDNS
+  - Driver: `gutenprint` (multi-brand)
+  - Configured in `modules/services/printing.nix`
+
+**NetworkManager:**
+- `networking.networkmanager.enable = true` — declared in `hosts/configuration.nix`
+  - `wheel` / `networkmanager` groups assigned to `nerv.primaryUser` entries via `modules/system/identity.nix`
+
+**Firmware Updates:**
+- `services.fwupd.enable = true` — pulls device firmware from Linux Vendor Firmware Service (LVFS)
+  - Applied manually: `fwupdmgr refresh && fwupdmgr upgrade`
+  - Configured in `modules/system/hardware.nix`
+
+**SSD TRIM:**
+- `services.fstrim.enable = true` — weekly TRIM via systemd timer
+  - Requires `allowDiscards = true` on the LUKS device (set in `modules/system/disko.nix`)
+  - Configured in `modules/system/hardware.nix`
 
 ## CI/CD & Deployment
 
-**Auto-upgrade (modules/system/nix.nix):**
-- `system.autoUpgrade` pulls from `/etc/nixos#host` daily
-- `allowReboot = false` — updates staged, manual reboot to apply
-- No CI pipeline or remote build cache configured in the library itself
+**Hosting:**
+- Self-hosted NixOS target machines — no cloud hosting
 
-**Deployment method:**
-- `nixos-rebuild switch --flake /etc/nixos#host` (aliased to `nrs` in `modules/services/zsh.nix`)
-- Home Manager requires `--impure` flag because `~/home.nix` lives outside the flake boundary
+**CI Pipeline:**
+- None detected — no `.github/workflows/`, `.cirrus.yml`, or similar CI config
+
+**Auto-upgrade:**
+- `system.autoUpgrade` — daily pull from `/etc/nixos#host` flake, `allowReboot = false`
+  - Staged updates require manual reboot to activate
+  - Configured in `modules/system/nix.nix`
+
+## Webhooks & Callbacks
+
+**Incoming:**
+- None
+
+**Outgoing:**
+- None
+
+## Environment Configuration
+
+**Required host values (all `PLACEHOLDER` in `hosts/configuration.nix`):**
+- `nerv.hostname` — machine hostname
+- `nerv.primaryUser` — list of primary user names
+- `nerv.hardware.cpu` — `"amd"` | `"intel"` | `"other"`
+- `nerv.hardware.gpu` — `"amd"` | `"nvidia"` | `"intel"` | `"none"`
+- `nerv.locale.timeZone`, `nerv.locale.defaultLocale`, `nerv.locale.keyMap`
+- `disko.devices.disk.main.device` — block device path (e.g. `/dev/nvme0n1`)
+- `nerv.disko.layout` — `"btrfs"` | `"lvm"`
+- `nerv.disko.lvm.swapSize`, `nerv.disko.lvm.storeSize`, `nerv.disko.lvm.persistSize` (LVM only)
+
+**No `.env` files** — all configuration is declarative Nix; no runtime environment variables
+
+**Secrets location:**
+- LUKS passphrase: `/tmp/luks-password` — pre-seeded by install script, used only during `disko` run
+- SSH host keys: generated at first boot, persisted to `/persist/etc/ssh/`
+- Secure Boot PKI: generated by `sbctl`, stored at `/persist/var/lib/sbctl/`
 
 ---
 
-## Home Manager Integration
-
-**Source (home/default.nix):**
-- Input: `github:nix-community/home-manager`
-- Wired as `home-manager.nixosModules.home-manager`
-- `useGlobalPkgs = true`, `useUserPackages = true`
-- Each user listed in `nerv.home.users` must maintain `~/home.nix`
-- `stateVersion` inherited from `osConfig.system.stateVersion` — user files need not set it
-
----
-
-## Webhooks & External APIs
-
-**Incoming:** None
-**Outgoing:** None
-
-This is a pure system configuration library with no HTTP server, no webhook receiver, and no outbound API calls.
-
----
-
-*Integration audit: 2026-03-08*
+*Integration audit: 2026-03-10*

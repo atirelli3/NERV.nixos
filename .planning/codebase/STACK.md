@@ -1,125 +1,110 @@
 # Technology Stack
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-10
 
 ## Languages
 
 **Primary:**
-- Nix (language) - All configuration, module logic, and build expressions. Used across every `.nix` file in the repository.
-
-**Secondary:**
-- Bash - Inline systemd service scripts (e.g., `secureboot-enroll-keys`, `secureboot-enroll-tpm2` in `modules/system/secureboot.nix`) and the `luks-cryptenroll` helper script.
+- Nix (NixOS module system) — all configuration, module definitions, disk layouts, service wiring
+- Bash (inline scripts) — initrd rollback script (`modules/system/disko.nix`), secureboot first-boot
+  services (`modules/system/secureboot.nix`), LUKS re-enrollment helper script (`modules/system/secureboot.nix`)
 
 ## Runtime
 
 **Environment:**
-- NixOS (Linux) - x86_64-linux only. Declared in `flake.nix` under all three `nixosConfigurations` entries (`host`, `server`, `vm`).
+- NixOS `nixos-unstable` channel — pinned via `nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable"` in `flake.nix`
+- Target architecture: `x86_64-linux` (both `host` and `server` nixosConfigurations)
+- `system.stateVersion = "25.11"` declared in `hosts/configuration.nix`
 
 **Package Manager:**
-- Nix (flakes mode) - Channels are disabled (`nix.channel.enable = false` in `modules/system/nix.nix`). Flakes handle all input pinning.
-- Lockfile: `flake.lock` (present — managed by Nix flake tooling)
+- Nix (flakes mode) — `experimental-features = [ "nix-command" "flakes" ]` set in `modules/system/nix.nix`
+- Legacy channels: disabled — `nix.channel.enable = false` in `modules/system/nix.nix`
+- Lockfile: `flake.lock` (present — managed by `nix flake update`)
 
 ## Frameworks
 
 **Core:**
-- NixOS Module System - The entire codebase is a NixOS module library. Every `.nix` file in `modules/` and `home/` is a NixOS module exposing `options.nerv.*` and `config` output.
+- NixOS module system — all configuration expressed as `{ config, lib, pkgs, ... }:` modules with
+  `options.*` / `config.*` separation; primary framework for every `.nix` file under `modules/`
+- Nix flakes — entry point is `flake.nix`; exports `nixosModules` and `nixosConfigurations`
 
 **Disk Layout:**
-- disko `v1.13.0` (`github:nix-community/disko`) - Declarative GPT/EFI/LUKS/LVM disk layout. Configuration in `hosts/disko-configuration.nix`.
-
-**Home Management:**
-- home-manager (`github:nix-community/home-manager`) - Wired as a NixOS module via `home/default.nix`. Tracks `nixpkgs` (pinned via `inputs.nixpkgs.follows`).
-
-**Secure Boot:**
-- lanzaboote (`github:nix-community/lanzaboote`) - UEFI Secure Boot bootloader. Optional — activated only when `nerv.secureboot.enable = true`. Replaces systemd-boot at runtime.
+- disko `v1.13.0` — `github:nix-community/disko/v1.13.0` (pinned); declarative GPT/LUKS/BTRFS
+  and GPT/LUKS/LVM layouts defined in `modules/system/disko.nix`
 
 **Impermanence:**
-- impermanence (`github:nix-community/impermanence`) - NixOS module for `environment.persistence`. Required only in `server` profile (`mode = "full"`). Desktop/VM use the built-in tmpfs approach from `modules/system/impermanence.nix`.
+- nix-community/impermanence — `github:nix-community/impermanence` (no release tags, HEAD);
+  provides `environment.persistence` bind-mount API used in `modules/system/impermanence.nix`
 
-## Key Dependencies (Flake Inputs)
+**Home Environment:**
+- Home Manager — `github:nix-community/home-manager` with `inputs.nixpkgs.follows = "nixpkgs"`;
+  wired as a NixOS module in `home/default.nix`; user config loaded from `~/home.nix` (outside flake,
+  requires `nixos-rebuild --impure`)
 
-| Input | Source | Version Pin | Purpose |
-|---|---|---|---|
-| `nixpkgs` | `github:NixOS/nixpkgs/nixos-unstable` | flake.lock | All packages and NixOS modules |
-| `lanzaboote` | `github:nix-community/lanzaboote` | flake.lock | Secure Boot bootloader |
-| `home-manager` | `github:nix-community/home-manager` | flake.lock | User environment management |
-| `disko` | `github:nix-community/disko/v1.13.0` | `v1.13.0` tag | Declarative disk partitioning |
-| `impermanence` | `github:nix-community/impermanence` | flake.lock | Server-mode root-as-tmpfs |
+**Secure Boot:**
+- Lanzaboote — `github:nix-community/lanzaboote` with `inputs.nixpkgs.follows = "nixpkgs"`;
+  replaces systemd-boot when `nerv.secureboot.enable = true`; configured in `modules/system/secureboot.nix`
 
-All community inputs except `impermanence` declare `inputs.nixpkgs.follows = "nixpkgs"` to prevent duplicate nixpkgs instances.
+## Key Dependencies
 
-## System Packages (Unconditional)
+**Critical (flake inputs):**
+- `nixpkgs` (`nixos-unstable`) — base package set and NixOS module library; all `pkgs.*` and `lib.*` calls
+- `disko` `v1.13.0` — declarative disk partitioning; `disko.nixosModules.disko` wired in both nixosConfigurations
+- `impermanence` (HEAD) — `environment.persistence` bind-mount module; `impermanence.nixosModules.impermanence`
+  in both nixosConfigurations
+- `home-manager` (unstable, follows nixpkgs) — user dotfile management; `home-manager.nixosModules.home-manager`
+- `lanzaboote` (unstable, follows nixpkgs) — Secure Boot bootloader; `lanzaboote.nixosModules.lanzaboote`
 
-Declared in `modules/system/packages.nix` — present on all profiles:
-- `git` - Version control; required for `nix flake` operations
-- `fastfetch` - System info display with NERV ASCII logo
+**System Packages (always-on):**
+- `pkgs.git` — version control; enabled via `programs.git.enable = true` in `modules/system/packages.nix`
+- `pkgs.fastfetch` — system info display; `modules/system/packages.nix`
 
-## System Packages (Conditional — security.nix)
-
-Always enabled (unconditional security module):
-- `lynis` - System hardening auditor
-- `aide` - File integrity monitor (AIDE)
-
-## System Packages (Conditional — secureboot.nix)
-
-Only when `nerv.secureboot.enable = true`:
-- `sbctl` - Secure Boot key management
-- `tpm2-tss` - TPM2 Software Stack library
-- `tpm2-tools` - TPM2 command-line utilities
-- `luks-cryptenroll` - Custom helper script (inline `pkgs.writeTextFile`)
-
-## System Packages (Conditional — pipewire.nix)
-
-Only when `nerv.audio.enable = true`:
-- `pwvucontrol` - Per-app volume control (GTK4/libadwaita)
-- `helvum` - PipeWire patchbay
-
-## System Packages (Conditional — zsh.nix)
-
-Only when `nerv.zsh.enable = true`:
-- `eza` - Modern `ls` replacement
-- `fzf` - Fuzzy finder (shell integration via inline source)
-- `zsh-syntax-highlighting` - Sourced manually in `interactiveShellInit`
-- `zsh-history-substring-search` - Sourced manually in `interactiveShellInit`
-
-## Kernel
-
-- **Default:** `pkgs.linuxPackages_zen` (set via `lib.mkForce` in `modules/system/kernel.nix`, overrides the `linuxPackages_latest` fallback in `modules/system/boot.nix`)
-- Zen kernel is optimized for desktop responsiveness / low latency
-- Blacklisted modules: `cramfs freevxfs jffs2 hfs hfsplus udf dccp sctp rds tipc`
+**Conditional Packages (service-dependent):**
+- `pkgs.btrfs-progs` — added to initrd store paths when `nerv.disko.layout = "btrfs"`; `modules/system/disko.nix`
+- `pkgs.sbctl`, `pkgs.tpm2-tss`, `pkgs.tpm2-tools` — Secure Boot management; `modules/system/secureboot.nix`
+- `pkgs.eza`, `pkgs.fzf` — shell utilities; added when `nerv.zsh.enable = true`; `modules/services/zsh.nix`
+- `pkgs.pwvucontrol`, `pkgs.helvum` — audio tools; added when `nerv.audio.enable = true`; `modules/services/pipewire.nix`
+- `pkgs.zsh-syntax-highlighting`, `pkgs.zsh-history-substring-search` — shell plugins; sourced manually in
+  `interactiveShellInit` in `modules/services/zsh.nix`
+- `pkgs.gutenprint` — printer driver; `modules/services/printing.nix`
+- `pkgs.lynis`, `pkgs.aide` — security auditing tools; always-on via `modules/system/security.nix`
+- `pkgs.terminus_font` — TTY console font; `modules/system/identity.nix`
 
 ## Configuration
 
-**Nix settings (modules/system/nix.nix):**
-- `experimental-features = [ "nix-command" "flakes" ]`
-- `allowed-users = [ "@wheel" ]`
-- `trusted-users = [ "root" ]`
-- `auto-optimise-store = true`
-- `keep-outputs = true`, `keep-derivations = true`
-- GC: automatic weekly, delete older than 20 days
-- Store optimise: automatic weekly
-- `nixpkgs.config.allowUnfree = true` (required for firmware blobs)
+**Nix daemon settings (`modules/system/nix.nix`):**
+- `auto-optimise-store = true` — deduplicates store after each build
+- `gc.automatic = true` with `--delete-older-than 20d` weekly
+- `keep-outputs = true`, `keep-derivations = true` — preserves dev shell sources
+- `allowed-users = [ "@wheel" ]`, `trusted-users = [ "root" ]`
+- `system.autoUpgrade` — enabled daily, pulls from `/etc/nixos#host`, `allowReboot = false`
 
-**Auto-upgrade:**
-- Daily pull from `/etc/nixos#host` flake reference
-- `allowReboot = false` — manual reboot required
+**Host-level configuration (`hosts/configuration.nix`):**
+- All values are `PLACEHOLDER` — must be filled per-machine before first boot
+- Required: `nerv.hostname`, `nerv.primaryUser`, `nerv.hardware.cpu`, `nerv.hardware.gpu`,
+  `nerv.locale.*`, `disko.devices.disk.main.device`, `nerv.disko.layout`, `nerv.disko.lvm.*` (if LVM)
 
-**Boot config (modules/system/boot.nix):**
-- initrd: systemd-based, LVM + LUKS
-- LUKS device label: `NIXLUKS` (must stay in sync with `disko-configuration.nix` and `secureboot.nix`)
-- Bootloader: systemd-boot (EFI), superseded by lanzaboote when secureboot enabled
+**nixpkgs:**
+- `nixpkgs.config.allowUnfree = true` — required for proprietary firmware and drivers; `modules/system/nix.nix`
+
+**Build:**
+- `flake.nix` — single entry point; no separate build config files
+- Rebuild command (aliased in zsh): `sudo nixos-rebuild switch --flake /etc/nixos#host`
 
 ## Platform Requirements
 
 **Development:**
-- NixOS or any Linux system with Nix flakes enabled
-- `nixos-rebuild --impure` required when `nerv.home.enable = true` (reads `~/home.nix` outside flake boundary)
+- Nix with flakes enabled (`nix-command` + `flakes` experimental features)
+- Target dev machine: any NixOS or nix-capable host that can run `nix flake check`
+- `nix flake check` — validates module evaluation before deploy
 
-**Production / Deployment:**
-- x86_64-linux only (all three `nixosConfigurations` are `system = "x86_64-linux"`)
-- Target disk must be identified and set in `hosts/configuration.nix` (`disko.devices.disk.main.device`)
-- All `PLACEHOLDER` values in `hosts/configuration.nix` must be replaced before `nixos-rebuild`
+**Production:**
+- Target OS: NixOS `x86_64-linux`
+- Two deployment profiles defined in `flake.nix`:
+  - `host` — desktop/laptop; BTRFS layout, audio, bluetooth, printing, impermanence (btrfs mode)
+  - `server` — headless server; LVM layout, openssh only, impermanence (full/tmpfs mode)
+- Secure Boot (optional): requires UEFI with Setup Mode accessible; `nerv.secureboot.enable = false` by default
 
 ---
 
-*Stack analysis: 2026-03-08*
+*Stack analysis: 2026-03-10*

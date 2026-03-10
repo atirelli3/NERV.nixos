@@ -1,153 +1,158 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-10
 
 ## Directory Layout
 
 ```
-nerv.nixos/
-├── flake.nix                    # Root flake: inputs, profiles, nixosModules exports, nixosConfigurations
-├── README.md                    # Project documentation
-├── hosts/                       # Machine-specific configuration (operator-fills placeholders)
-│   ├── configuration.nix        # Identity, locale, hardware enums, disko disk device
-│   ├── disko-configuration.nix  # GPT/EFI/LUKS/LVM disk layout (placeholder sizes)
-│   └── hardware-configuration.nix  # Placeholder — replaced by nixos-generate-config per machine
-├── modules/                     # NERV module library
-│   ├── default.nix              # Top-level aggregator: imports system + services + home
-│   ├── system/                  # Low-level system configuration
-│   │   ├── default.nix          # System aggregator (import order is significant)
-│   │   ├── identity.nix         # nerv.hostname, nerv.locale.*, nerv.primaryUser
-│   │   ├── hardware.nix         # nerv.hardware.cpu / gpu — microcode + drivers
-│   │   ├── kernel.nix           # Kernel package selection (zen kernel)
-│   │   ├── security.nix         # AppArmor, auditd, ClamAV, AIDE — always-on
-│   │   ├── nix.nix              # Nix daemon, GC, optimise, autoUpgrade, flakes
-│   │   ├── packages.nix         # Base packages: git, fastfetch (unconditional)
-│   │   ├── boot.nix             # initrd systemd + LUKS + systemd-boot (opaque)
-│   │   ├── impermanence.nix     # nerv.impermanence.{enable,mode,persistPath,...}
-│   │   └── secureboot.nix       # nerv.secureboot.enable — Lanzaboote + TPM2 (last import)
-│   └── services/                # Optional userspace services
-│       ├── default.nix          # Services aggregator
-│       ├── openssh.nix          # nerv.openssh — sshd + endlessh tarpit + fail2ban
-│       ├── pipewire.nix         # nerv.audio — PipeWire audio stack
-│       ├── bluetooth.nix        # nerv.bluetooth — BlueZ + bluetooth tools
-│       ├── printing.nix         # nerv.printing — CUPS + common drivers
-│       └── zsh.nix              # nerv.zsh — Zsh with keybindings, fzf, git aliases
-├── home/                        # Home Manager NixOS module wiring
-│   └── default.nix              # nerv.home.{enable,users} — generates home-manager.users.*
-└── docs/                        # Project documentation assets
-    └── assets/                  # Logo and media files
+NERV.nixos/
+├── flake.nix                     # Flake inputs, profiles, nixosConfigurations, nixosModules exports
+├── flake.lock                    # (generated) pinned input hashes
+├── README.md                     # Installation guide and usage documentation
+├── cmd-flow.txt                  # Command reference for install/rebuild workflow
+├── disk-layout-refactor.md       # Historical design notes for disk layout decisions
+├── hosts/
+│   ├── configuration.nix         # Machine identity — all PLACEHOLDER values, filled per host
+│   └── hardware-configuration.nix # Placeholder; replaced with nixos-generate-config output
+├── modules/
+│   ├── default.nix               # Top-level aggregator: imports system + services + home
+│   ├── system/
+│   │   ├── default.nix           # System aggregator — import order is significant
+│   │   ├── identity.nix          # nerv.hostname, nerv.locale.*, nerv.primaryUser
+│   │   ├── hardware.nix          # nerv.hardware.cpu/gpu — microcode, GPU drivers, firmware
+│   │   ├── kernel.nix            # Zen kernel, kernel params, sysctl hardening, module blacklist
+│   │   ├── security.nix          # AppArmor, auditd, ClamAV, AIDE — always-on, opaque
+│   │   ├── nix.nix               # Nix daemon, GC, store optimise, autoUpgrade, flake settings
+│   │   ├── packages.nix          # Base packages shipped on all flavors (git, fastfetch)
+│   │   ├── boot.nix              # systemd stage 1, systemd-boot, EFI — layout-agnostic
+│   │   ├── impermanence.nix      # nerv.impermanence.{enable,mode,persistPath,extraDirs,users}
+│   │   ├── disko.nix             # nerv.disko.layout (btrfs/lvm), disk layout, rollback service
+│   │   └── secureboot.nix        # nerv.secureboot.enable — Lanzaboote + TPM2 (must be last)
+│   └── services/
+│       ├── default.nix           # Services aggregator
+│       ├── openssh.nix           # nerv.openssh — sshd + endlessh tarpit + fail2ban
+│       ├── pipewire.nix          # nerv.audio — PipeWire + ALSA + PulseAudio compat + AirPlay
+│       ├── bluetooth.nix         # nerv.bluetooth — BlueZ + blueman + WirePlumber BT config
+│       ├── printing.nix          # nerv.printing — CUPS + Avahi/mDNS printer discovery
+│       └── zsh.nix               # nerv.zsh — Zsh shell, history, aliases, fzf, syntax highlight
+├── home/
+│   └── default.nix               # nerv.home.{enable,users} — Home Manager NixOS module wiring
+├── docs/
+│   └── assets/                   # Documentation assets (images, diagrams)
+└── .planning/
+    ├── codebase/                  # Codebase analysis documents (this directory)
+    ├── phases/                    # Phase implementation plans (01–12)
+    └── research/                  # Research notes
 ```
 
 ## Directory Purposes
 
-**`flake.nix` (root file):**
-- Purpose: Single source of truth for inputs, profile definitions, module exports, and build targets
-- Contains: `hostProfile`, `serverProfile`, `vmProfile` attrsets; `nixosModules.{default,system,services,home}`; `nixosConfigurations.{host,server,vm}`
-- Key files: `flake.nix`
-
 **`hosts/`:**
-- Purpose: Machine-specific layer — the only place an operator edits to adapt NERV to a real machine
-- Contains: Identity values (`nerv.hostname`, `nerv.primaryUser`, `nerv.hardware.*`, `nerv.locale.*`), disk layout, hardware config
-- Key files: `hosts/configuration.nix`, `hosts/disko-configuration.nix`, `hosts/hardware-configuration.nix`
+- Purpose: Machine-specific configuration. The only place operator fills in hardware details.
+- Contains: `configuration.nix` (identity, hardware, locale, disk device), `hardware-configuration.nix` (generated per-machine)
+- Key files: `hosts/configuration.nix` — edit this first on any new machine
 
 **`modules/system/`:**
-- Purpose: Always-evaluated system modules; some are opaque (no options), some are feature-gated
-- Contains: Kernel, hardware, boot, security hardening, Nix daemon config, impermanence, Secure Boot
-- Key files: `modules/system/default.nix`, `modules/system/security.nix`, `modules/system/impermanence.nix`, `modules/system/secureboot.nix`
+- Purpose: OS-level modules. All are always imported (via aggregator); each is conditionally activated by its `nerv.*` option.
+- Contains: Ten `.nix` files covering disk, boot, kernel, hardware, identity, security, Nix daemon, packages, impermanence, and secure boot
+- Key files: `modules/system/disko.nix` (disk layout + rollback), `modules/system/impermanence.nix` (persistence modes), `modules/system/secureboot.nix` (must be last)
 
 **`modules/services/`:**
-- Purpose: Optional, independently toggled userspace services; all default to `enable = false`
-- Contains: SSH, audio, bluetooth, printing, shell
-- Key files: `modules/services/default.nix`, `modules/services/openssh.nix`, `modules/services/zsh.nix`
+- Purpose: Opt-in service modules. None active unless explicitly enabled via profile or host config.
+- Contains: Five `.nix` files: `openssh.nix`, `pipewire.nix`, `bluetooth.nix`, `printing.nix`, `zsh.nix`
+- Key files: `modules/services/openssh.nix` (SSH hardening with tarpit + fail2ban)
 
 **`home/`:**
-- Purpose: Bridges the NixOS system configuration with per-user Home Manager configs stored outside the flake
-- Contains: A single `default.nix` that generates `home-manager.users.*` entries from `nerv.home.users` list
+- Purpose: Home Manager integration. Wires per-user `~/home.nix` files (which live outside the repo).
+- Contains: `home/default.nix` only — a single NixOS module
 - Key files: `home/default.nix`
 
+**`docs/`:**
+- Purpose: Documentation assets. Prose docs are in `README.md` at repo root.
+- Contains: `docs/assets/` for images and diagrams
+
 **`.planning/`:**
-- Purpose: GSD planning documents — phases, research, codebase analysis
-- Contains: Phase execution records under `.planning/phases/`, codebase maps under `.planning/codebase/`, research notes under `.planning/research/`
+- Purpose: GSD planning documents. Not evaluated by Nix.
+- Contains: `codebase/` (analysis docs), `phases/` (01–12 implementation plans), `research/`
 - Generated: No
 - Committed: Yes
 
 ## Key File Locations
 
 **Entry Points:**
-- `flake.nix`: Root flake — all builds, module exports, and profile composition start here
-- `modules/default.nix`: Primary module entry point imported by all `nixosConfigurations.*` targets
-- `hosts/configuration.nix`: Operator-filled machine identity consumed by all build targets
+- `flake.nix`: Flake root — all `nixos-rebuild` and `disko` commands resolve here
+- `hosts/configuration.nix`: Machine identity — first file an operator edits for a new host
 
 **Configuration:**
-- `flake.nix` lines 35–74: Profile attrsets (`hostProfile`, `serverProfile`, `vmProfile`)
-- `hosts/disko-configuration.nix`: Disk partitioning layout (GPT → LUKS → LVM → swap/store/persist)
-- `hosts/hardware-configuration.nix`: Placeholder replaced by `nixos-generate-config` output
+- `flake.nix` (lines 35–62): `hostProfile` and `serverProfile` attrsets — the primary knobs for feature selection
+- `hosts/configuration.nix`: All `PLACEHOLDER` values — hostname, user, CPU, GPU, locale, disk device, layout, LVM sizes
 
 **Core Logic:**
-- `modules/system/impermanence.nix`: Two-mode impermanence (minimal tmpfs dirs vs. full tmpfs root + `/persist`)
-- `modules/system/secureboot.nix`: Two-boot Lanzaboote + TPM2 auto-enrollment sequence
-- `modules/system/security.nix`: Always-on security stack (AppArmor, auditd, ClamAV, AIDE)
-- `modules/services/openssh.nix`: Hardened SSH with endlessh tarpit and fail2ban
+- `modules/system/disko.nix`: Disk layout declaration + BTRFS rollback systemd service in initrd
+- `modules/system/impermanence.nix`: Persistence bind mounts; `btrfs` vs `full` mode branching
+- `modules/system/secureboot.nix`: Lanzaboote + two-boot TPM2 enrollment sequence
+- `modules/system/kernel.nix`: Zen kernel selection + sysctl hardening (authoritative over `boot.nix`)
+- `modules/system/security.nix`: AppArmor + auditd + ClamAV + AIDE — always-on, no option gate
 
-**Aggregators (composition points):**
-- `modules/default.nix`: Imports `./system`, `./services`, `../home`
-- `modules/system/default.nix`: Imports all 9 system submodules in dependency order
-- `modules/services/default.nix`: Imports all 5 service modules
+**Home Manager:**
+- `home/default.nix`: NixOS module that reads `nerv.home.users` and generates `home-manager.users`
+- `/home/<username>/home.nix`: Per-user file, lives outside repo, imported at build time via `--impure`
 
 ## Naming Conventions
 
 **Files:**
-- Lowercase with hyphens for multi-word names: `disko-configuration.nix`, `hardware-configuration.nix`
-- Single-word feature names match the service name: `openssh.nix`, `bluetooth.nix`, `printing.nix`
-- Aggregators always named `default.nix`
+- All Nix modules: `<feature>.nix` in lowercase (e.g., `identity.nix`, `openssh.nix`)
+- Aggregator files: always named `default.nix` — Nix resolves directory imports to `default.nix`
+- Documentation: `README.md` at root; planning docs in `.planning/`
 
 **Directories:**
-- Lowercase, single word: `system/`, `services/`, `home/`, `hosts/`, `modules/`
+- Module subtrees: lowercase, plural noun describing the category (`system`, `services`)
+- Host configs: flat under `hosts/` — no per-host subdirectory (single-host library design)
+- Planning: `.planning/phases/<NN>-<slug>/` where `NN` is zero-padded phase number
 
-**Nix Option Namespace:**
-- All NERV options under `nerv.*`: `nerv.hostname`, `nerv.openssh.enable`, `nerv.hardware.cpu`
-- Feature enable options follow `nerv.<feature>.enable` pattern using `lib.mkEnableOption`
-- Sub-options grouped under `nerv.<feature>.*`: `nerv.impermanence.mode`, `nerv.openssh.port`
+**NixOS Options:**
+- All library options live under `nerv.<module>.<option>` (e.g., `nerv.openssh.port`, `nerv.disko.layout`)
+- Enable flags always use `lib.mkEnableOption` — produces a boolean option named `enable`
+- Enum options have no default when the absence of a default enforces explicit declaration (e.g., `nerv.disko.layout`, `nerv.impermanence.mode`)
 
-**Local Variables in Modules:**
-- Config binding: `cfg = config.nerv.<module>` at the top of each `let` block
-- Derived attrsets: descriptive camelCase names (`extraDirFileSystems`, `userFileSystems`, `userTmpfilesRules`)
+**Nix Identifiers:**
+- Local config bindings: `cfg = config.nerv.<module>` (consistent across all modules)
+- Profile attrsets in `flake.nix`: camelCase (`hostProfile`, `serverProfile`)
+- Shared LUKS/ESP attrsets in `disko.nix`: camelCase (`sharedEsp`, `sharedLuksOuter`)
 
 ## Where to Add New Code
 
-**New System Module (always-on, opaque):**
-- Implementation: `modules/system/<name>.nix`
-- Register: Add `./name` to the imports list in `modules/system/default.nix`
-- Pattern: No `options.*` block; emit `config.*` unconditionally
+**New system module (e.g., `firewall.nix`):**
+- Implementation: `modules/system/firewall.nix` — declare `options.nerv.firewall.*` and `config = lib.mkIf cfg.enable { ... }`
+- Register: Add `./firewall.nix` to the imports list in `modules/system/default.nix` (before `./secureboot.nix`)
+- Enable in profile: Add `nerv.firewall.enable = true` to `hostProfile` or `serverProfile` in `flake.nix`
 
-**New Feature-Gated System Module:**
-- Implementation: `modules/system/<name>.nix` — declare `options.nerv.<name>.enable` with `lib.mkEnableOption`, wrap all `config` in `lib.mkIf cfg.enable`
-- Register: Add `./name` to `modules/system/default.nix` imports (before `secureboot.nix` if it uses `lib.mkForce`)
-- Profile wiring: Add `nerv.<name>.enable = true/false` to each profile attrset in `flake.nix`
+**New service module (e.g., `syncthing.nix`):**
+- Implementation: `modules/services/syncthing.nix` — same pattern as `modules/services/openssh.nix`
+- Register: Add `./syncthing.nix` to the imports list in `modules/services/default.nix`
+- Enable in profile: Add `nerv.syncthing.enable = true` to the relevant profile in `flake.nix`
 
-**New Service Module:**
-- Implementation: `modules/services/<name>.nix` — same option pattern as feature-gated system modules
-- Register: Add `./name` to `modules/services/default.nix` imports
-- Profile wiring: Add `nerv.<name>.enable = true/false` to relevant profiles in `flake.nix`
+**New host-specific value:**
+- Add to `hosts/configuration.nix` only — never add host-specific values to library modules
 
-**Utilities / Helpers:**
-- Inline as `let` bindings within the module file that needs them — no shared utility directory exists or is needed given the Nix evaluation model
+**New Home Manager option:**
+- Add to `home/default.nix` under `options.nerv.home.*` and the corresponding `config = lib.mkIf cfg.enable { ... }` block
 
-**Additional nixosConfiguration Targets:**
-- Add a new entry to `nixosConfigurations` in `flake.nix`; select or define a profile attrset; reuse `self.nixosModules.default` and the existing `hosts/` files, or create a new host directory
+**Utilities / shared Nix expressions:**
+- No `lib/` directory exists. Inline shared expressions as `let` bindings within the module that needs them. If a helper is needed in multiple modules, evaluate adding a `lib/` directory — currently none exists.
 
 ## Special Directories
 
 **`.planning/`:**
-- Purpose: GSD orchestration documents — phase plans, research, and codebase maps used by `/gsd:*` commands
+- Purpose: GSD orchestration files — phases, research, codebase analysis
 - Generated: No
-- Committed: Yes
+- Committed: Yes — part of the repo history
 
 **`docs/assets/`:**
-- Purpose: Logo and media assets referenced in `README.md`
+- Purpose: Images and diagrams for documentation
 - Generated: No
 - Committed: Yes
 
 ---
 
-*Structure analysis: 2026-03-08*
+*Structure analysis: 2026-03-10*

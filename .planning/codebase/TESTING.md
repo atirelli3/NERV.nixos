@@ -1,137 +1,127 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-10
 
 ## Test Framework
 
-**Runner:** None — no automated test suite exists in this codebase.
+**Runner:** None detected.
 
-This is a NixOS configuration library written in the Nix expression language. It has no traditional unit test framework (no Jest, pytest, vitest, etc.). Validation is performed through a combination of:
+There are no test files, no test runner configuration, and no test-related entries in the codebase. This is a NixOS configuration library, not a general-purpose software project. The codebase does not use `nixosTests`, `testers.runNixOSTest`, `pkgs.testers`, or any external test harness (Jest, pytest, etc.).
 
-1. **NixOS module system assertions** — `assertions` blocks inside module `config` sections catch invariant violations at `nixos-rebuild` / `nix flake check` time.
-2. **Nix type system** — `lib.types.*` declarations on options provide static type checking evaluated during configuration.
-3. **Manual `nixos-rebuild` testing** — the primary validation mechanism is building and switching configurations.
+**Config files checked:** No `jest.config.*`, `vitest.config.*`, `pytest.ini`, `flake.nix#checks`, or similar were found.
 
-## Assertions (Built-in Validation)
+## What "Testing" Means in This Codebase
 
-Assertions are the closest equivalent to unit tests in this codebase. They fire at build time with a descriptive error message.
+Correctness is enforced at evaluation time via three mechanisms, all implemented inside the modules themselves:
 
-**Location:** Inside `config = lib.mkIf cfg.enable { assertions = [...]; }` blocks.
+### 1. NixOS Assertions (Hard Failures)
 
-**Pattern:**
+`assertions` blocks in module config cause `nixos-rebuild` to fail with a human-readable message if an invariant is violated. This is the primary correctness gate.
+
 ```nix
+# modules/services/openssh.nix
 assertions = [{
   assertion = cfg.tarpitPort != cfg.port;
   message   = "nerv.openssh.tarpitPort (${toString cfg.tarpitPort}) must differ from nerv.openssh.port (${toString cfg.port}).";
 }];
 ```
 
-Files containing assertions:
-- `modules/services/openssh.nix` — asserts tarpitPort != port
-- `modules/system/identity.nix` — asserts hostname is non-empty string
-- `modules/system/impermanence.nix` — asserts `/var/lib/sbctl` is not in tmpfs paths when secureboot is enabled
-
-**Conditional assertions** use `lib.optional` so the assertion itself is only evaluated when relevant:
 ```nix
+# modules/system/identity.nix
+assertions = [{
+  assertion = config.nerv.hostname != "";
+  message   = "nerv.hostname must not be empty string.";
+}];
+```
+
+```nix
+# modules/system/impermanence.nix
 assertions = lib.optional config.nerv.secureboot.enable {
   assertion = !(lib.any isSbctlPath allPaths);
-  message   = "nerv: /var/lib/sbctl is in impermanence tmpfs paths — ...";
+  message = "nerv: /var/lib/sbctl is in impermanence tmpfs paths — this would wipe Secure Boot keys on every reboot. ...";
 };
 ```
 
-## Type Validation
+Files using assertions: `modules/services/openssh.nix`, `modules/system/identity.nix`, `modules/system/impermanence.nix`.
 
-NixOS option types provide compile-time checking. The types used across this codebase:
+### 2. NixOS Warnings (Soft Failures)
 
-| Type | Used for |
-|------|----------|
-| `lib.types.str` | String values (hostname, timezone, locale) |
-| `lib.types.port` | Network ports (openssh.port, openssh.tarpitPort) |
-| `lib.types.bool` | Boolean flags (passwordAuth, kbdInteractiveAuth) |
-| `lib.types.listOf lib.types.str` | User lists, allow lists, extraDirs |
-| `lib.types.enum [ "amd" "intel" "other" ]` | Constrained string choices |
-| `lib.types.attrsOf (lib.types.attrsOf lib.types.str)` | Per-user path/size maps (impermanence.users) |
+`warnings` blocks emit a message during `nixos-rebuild` without blocking the build. Used for recoverable misconfigurations where the system remains functional but the operator should act.
 
-Type errors surface at `nix flake check` or `nixos-rebuild` time before any deployment occurs.
+```nix
+# modules/system/impermanence.nix
+warnings =
+  lib.optionals (config.nerv.secureboot.enable && !sbctlCovered)
+    [ "nerv: secureboot is enabled but /var/lib/sbctl is not covered by environment.persistence in btrfs mode — sbctl keys will be lost on rollback." ];
+```
 
-## How to Validate the Configuration
+The docstring in `impermanence.nix` explicitly explains the choice between assertion and warning:
+> Using lib.warn (not assertion) — preserves nix flake check during multi-step migrations; missing sbctl persistence loses keys on next rollback but is recoverable via re-enrollment, unlike the IMPL-02 scenario (tmpfs wipe) which uses a hard assertion.
 
-There is no `npm test` or equivalent. Validation commands:
+File: `modules/system/impermanence.nix` lines 165–176.
+
+### 3. Nix Type System
+
+`lib.mkOption` with explicit `type` constraints catches type errors at evaluation. Enum constraints replace runtime validation for options with a fixed set of valid values:
+
+```nix
+type = lib.types.enum [ "btrfs" "lvm" ]
+type = lib.types.enum [ "amd" "intel" "other" ]
+type = lib.types.enum [ "amd" "nvidia" "intel" "none" ]
+type = lib.types.port
+type = lib.types.listOf lib.types.str
+type = lib.types.attrsOf (lib.types.attrsOf lib.types.str)
+```
+
+## Manual Validation Commands
+
+The primary "test run" for this codebase is:
 
 ```bash
-# Static evaluation — checks types, assertions, and option definitions
+# Evaluate the flake without building — catches type errors and assertion failures
 nix flake check /etc/nixos
 
-# Build without switching — catches runtime configuration errors
-sudo nixos-rebuild build --flake /etc/nixos#host
-
-# Build and test without activating
-sudo nixos-rebuild test --flake /etc/nixos#host
-
-# Full switch — apply to running system
+# Build and switch on target machine
 sudo nixos-rebuild switch --flake /etc/nixos#host
 
-# Zsh aliases provided by the codebase itself (when nerv.zsh.enable = true):
-nrs   # nixos-rebuild switch --flake /etc/nixos#host
-nrb   # nixos-rebuild boot   --flake /etc/nixos#host
-nrt   # nixos-rebuild test   --flake /etc/nixos#host
+# Build only (no switch) — validates configuration evaluates successfully
+sudo nixos-rebuild build --flake /etc/nixos#host
+
+# Test build in a temporary profile without activating
+sudo nixos-rebuild test --flake /etc/nixos#host
 ```
 
-## NixOS VM Testing (Available, Not Implemented)
+Aliases defined in `modules/services/zsh.nix`: `nrs`, `nrb`, `nrt`.
 
-NixOS provides `nixpkgs.lib.nixos.runTests` and `nixpkgs.lib.nixosSystem` with `config.system.build.vm` for integration testing in a QEMU VM. This is not currently used in the codebase. If added, the pattern would be:
+## Test Coverage Gaps
+
+**No automated test suite exists.** All validation is declarative (Nix type system + assertions) or manual (nixos-rebuild). The following areas have no automated coverage:
+
+- **Systemd service correctness** (`secureboot-enroll-keys`, `secureboot-enroll-tpm2`, `aide-check`, `mpris-proxy`, `obex` override in `bluetooth.nix`) — these run at boot and are never exercised outside a real or VM boot.
+- **BTRFS rollback service** (`boot.initrd.systemd.services.rollback` in `disko.nix`) — requires a real boot cycle to validate.
+- **Disko layout generation** — `nerv.disko.layout = "btrfs"` and `"lvm"` branches are not validated against a real disk in CI.
+- **Home Manager wiring** (`home/default.nix`) — the `--impure` flag requirement and `/home/<name>/home.nix` path resolution are not tested.
+- **Profile composition** (`flake.nix` `hostProfile` / `serverProfile`) — no `pkgs.testers.runNixOSTest` or `nixosTests` VM tests exist.
+- **Cross-module constraints** (e.g., `nerv.disko.layout = "btrfs"` required when `nerv.impermanence.mode = "btrfs"`) — documented in comments but not enforced by an assertion.
+
+## Adding Tests
+
+If automated testing is introduced, the standard NixOS approach is `pkgs.testers.runNixOSTest` (or `nixosTests`) in `flake.nix#checks`:
 
 ```nix
-# In flake.nix outputs:
-checks.x86_64-linux.module-test = nixpkgs.lib.nixos.runTests {
-  imports = [ self.nixosModules.default ];
-  # ... test configuration and assertions
+# flake.nix — example structure for future tests
+checks."x86_64-linux".openssh-module = pkgs.testers.runNixOSTest {
+  name = "nerv-openssh";
+  nodes.machine = { ... };
+  testScript = ''
+    machine.wait_for_unit("sshd.service")
+    ...
+  '';
 };
 ```
 
-## Test Coverage
-
-**What is validated at build time:**
-- Port conflict between SSH daemon and endlessh tarpit (`openssh.nix`)
-- Non-empty hostname requirement (`identity.nix`)
-- Secure Boot + impermanence sbctl path safety (`impermanence.nix`)
-- All option type constraints (via NixOS type system, all modules)
-- Import order for `secureboot.nix` (by convention + comment, not automated)
-
-**What is NOT validated automatically:**
-- Cross-file label consistency (`NIXLUKS` label appears in `boot.nix`, `disko-configuration.nix`, `secureboot.nix` — kept in sync by comment only)
-- Hardware-specific correctness (GPU/CPU driver selection)
-- Runtime behavior of systemd services (secureboot enrollment scripts, AIDE timer, mpris-proxy)
-- Actual disk layout matches disko configuration
-- Home Manager user configurations (`~/home.nix` contents are outside the flake boundary)
-
-**Coverage gaps that carry risk:**
-- `hosts/configuration.nix` contains literal `"PLACEHOLDER"` strings — no assertion validates these are replaced before deployment. A `nixos-rebuild switch` with `nerv.hostname = "PLACEHOLDER"` will succeed at the Nix level.
-- The two-boot secureboot enrollment sequence (`secureboot.nix`) is state-machine logic in shell scripts with no automated verification.
-
-## Adding New Assertions
-
-When adding a new module option that has interdependencies or invariants, add an assertion. Follow this pattern in `modules/services/<name>.nix` or `modules/system/<name>.nix`:
-
-```nix
-config = lib.mkIf cfg.enable {
-  assertions = [{
-    assertion = <bool expression>;
-    message   = "<descriptive message with ${interpolated} actual values>";
-  }];
-  # rest of config...
-};
-```
-
-For assertions that should only fire when another nerv feature is also enabled, use `lib.optional`:
-
-```nix
-assertions = lib.optional config.nerv.<other-feature>.enable {
-  assertion = <bool>;
-  message   = "...";
-};
-```
+Test files would live in a `tests/` directory at the repo root, imported as modules in `flake.nix#checks`.
 
 ---
 
-*Testing analysis: 2026-03-08*
+*Testing analysis: 2026-03-10*
