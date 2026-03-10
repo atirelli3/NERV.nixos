@@ -1,14 +1,15 @@
 # modules/system/impermanence.nix
 #
-# Purpose  : Selective per-directory tmpfs mounts — /tmp, /var/tmp, and user volatile dirs.
-#            Full mode: / as tmpfs + environment.persistence for server use.
-# Model    : minimal — Root (/) stays on disk; specific dirs mounted as tmpfs at boot.
-#            full    — Root (/) is tmpfs; /persist holds system state via environment.persistence.
-#            The upstream nixos-community/impermanence module is used only in full mode.
+# Purpose  : Selective persistence via environment.persistence bind-mounts from /persist.
+#            btrfs mode — for desktop/laptop: BTRFS rollback resets root on each boot;
+#            /persist (@persist subvolume) holds state. No tmpfs /.
+#            full mode  — for server: / as tmpfs; /persist holds state.
 # Options  : nerv.impermanence.enable, mode, persistPath, extraDirs, users
-# Defaults : enable = false; mode = minimal; persistPath = "/persist"; extraDirs = []; users = {}
-# Override : lib.mkForce on any fileSystems.* entry, or disable impermanence entirely.
-# Note     : full mode requires impermanence.nixosModules.impermanence in the host's modules list.
+# Defaults : enable = false; persistPath = "/persist"; extraDirs = []; users = {}
+#            mode has NO default — must be declared explicitly per host.
+# Override : lib.mkForce on any fileSystems.* or environment.persistence entry.
+# Note     : Both modes require impermanence.nixosModules.impermanence in the host's
+#            modules list for environment.persistence to function.
 
 { config, lib, pkgs, ... }:
 
@@ -41,14 +42,17 @@ in {
     enable = lib.mkEnableOption "selective per-directory tmpfs impermanence";
 
     mode = lib.mkOption {
-      type        = lib.types.enum [ "minimal" "full" ];
-      default     = "minimal";
+      type        = lib.types.enum [ "btrfs" "full" ];
       description = ''
         Impermanence mode.
-          minimal — /tmp and /var/tmp as tmpfs; root stays on disk. Default for desktop/VM profiles.
-          full    — / as tmpfs (resets on reboot); /persist holds system state via
-                    environment.persistence. Requires impermanence.nixosModules.impermanence
-                    in the host nixosConfigurations modules list. For server profiles.
+          btrfs — Root stays on BTRFS @; rollback service resets @ on each boot.
+                  /persist (@persist subvolume) holds state via environment.persistence.
+                  For desktop/laptop profiles. Requires nerv.disko.layout = "btrfs".
+          full  — / as tmpfs (resets on reboot); /persist holds system state via
+                  environment.persistence. For server profiles.
+                  Requires impermanence.nixosModules.impermanence in nixosConfigurations modules list.
+        Intentionally no default — forces explicit declaration per host;
+        consistent with nerv.disko.layout and nerv.hostname.
       '';
     };
 
@@ -61,7 +65,7 @@ in {
     extraDirs = lib.mkOption {
       type        = lib.types.listOf lib.types.str;
       default     = [];
-      description = "Additional absolute system paths to mount as tmpfs. Additive to the defaults (/tmp, /var/tmp).";
+      description = "Additional absolute system paths to mount as tmpfs.";
       example     = [ "/var/cache/app" ];
     };
 
@@ -89,20 +93,9 @@ in {
         message = "nerv: /var/lib/sbctl is in impermanence tmpfs paths — this would wipe Secure Boot keys on every reboot. Remove it from impermanence configuration.";
       };
 
-      # Default system tmpfs mounts plus any configured extraDirs and user paths.
+      # extraDirs and per-user tmpfs mounts — additive; no default system paths.
       # Merged via // (attrset union) so keys are static from pushDownProperties' view.
-      fileSystems = {
-        "/tmp" = {
-          device  = "tmpfs";
-          fsType  = "tmpfs";
-          options = [ "size=25%" "mode=1777" "nosuid" "nodev" ];
-        };
-        "/var/tmp" = {
-          device  = "tmpfs";
-          fsType  = "tmpfs";
-          options = [ "size=25%" "mode=1777" "nosuid" "nodev" ];
-        };
-      } // extraDirFileSystems // userFileSystems;
+      fileSystems = extraDirFileSystems // userFileSystems;
 
       systemd.tmpfiles.rules = userTmpfilesRules;
     }
