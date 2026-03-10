@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Completed 12-profile-wiring-and-documentation-01-PLAN.md
-last_updated: "2026-03-10T10:04:03.778Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-03-10T10:04:11.157Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 12
@@ -171,6 +171,8 @@ Recent decisions affecting current work:
 - [Phase 11-impermanence-btrfs-mode]: /var/lib persisted as single broad directory in btrfs mode — covers all service state (nixos, systemd, sbctl, BT, NM, cups); /var/log excluded (handled by @log BTRFS subvolume in disko.nix, double-mount conflict otherwise)
 - [Phase 11-impermanence-btrfs-mode]: sbctl warning in btrfs block uses static persistDirs list to avoid self-reference cycle; warning (not assertion) preserves nix flake check during multi-step migrations
 - [Phase 12-profile-wiring-and-documentation]: nerv.disko.layout placed as first attribute in each profile block; vmProfile and nixosConfigurations.vm deleted cleanly (no stubs) per CONTEXT.md locked decision
+- [Phase 12-02]: Profiles cross-reference lines placed after the last line of each header's final section (LUKS, Note) — consistent insertion point across all three modules
+- [Phase 12-02]: hosts/configuration.nix Role line updated to remove vmProfile reference (profile removed in Phase 8; header was stale)
 
 ### v2.0 Decisions (pre-phase)
 
@@ -194,7 +196,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-10T10:03:56.021Z
-Stopped at: Completed 12-profile-wiring-and-documentation-01-PLAN.md
+Last session: 2026-03-10T10:04:11.154Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
 Next action: /gsd:plan-phase 9
