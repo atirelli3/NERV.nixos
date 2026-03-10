@@ -25,7 +25,7 @@ NERV.nixos is a NixOS flake that provides hardened system defaults as composable
 - SSH daemon hardened with endlessh tarpit, fail2ban with exponential ban growth
 - PipeWire audio stack with low-latency defaults, AirPlay sink, and ALSA/PulseAudio compat
 - Bluetooth (OBEX), printing (CUPS + Avahi), ZSH with autosuggestions
-- Impermanence — `minimal` mode mounts `/tmp` and `/var/tmp` as tmpfs; `full` mode wipes `/` on reboot and persists state to `/persist`
+- Impermanence — `btrfs` mode uses BTRFS rollback to reset `/` on every boot, persisting state to `/persist` (@persist subvolume); `full` mode wipes `/` on reboot and persists state to `/persist` (LVM)
 - Home Manager NixOS wiring — each user owns `~/home.nix`; NERV imports it automatically
 - Typed NixOS module options (`nerv.*`) for every user-configurable parameter
 
@@ -41,9 +41,8 @@ Three profiles are defined inline in `flake.nix`. Pick the one that matches your
 
 | Profile | Use case | Key differences |
 |---------|----------|-----------------|
-| `host`   | Desktop / laptop | Audio, Bluetooth, printing, Lanzaboote, minimal impermanence |
-| `server` | Headless server  | SSH only, full impermanence (`/` as tmpfs, state on `/persist`) |
-| `vm`     | Virtual machine  | Like host but no Bluetooth, printing, or Secure Boot (no TPM2) |
+| `host`   | Desktop / laptop | Audio, Bluetooth, printing, Lanzaboote, BTRFS impermanence (rollback on boot) |
+| `server` | Headless server  | SSH only, LVM layout, full impermanence (`/` as tmpfs, state on `/persist`) |
 
 ---
 
@@ -89,7 +88,55 @@ nixos-rebuild switch --flake /etc/nixos#host --impure
 
 ---
 
-### B — Existing NixOS system
+### B — BTRFS layout (hostProfile)
+
+> **Before you begin:** find your disk name (`lsblk -d -o NAME,SIZE,MODEL`). NERV uses `modules/system/disko.nix` — the disk layout is configured via `nerv.disko.layout = "btrfs"` in `hostProfile` (already set). Fill `hosts/configuration.nix` with your machine-specific values.
+
+> **Warning:** The step that creates `@root-blank` (step 5 below) is mandatory. The initrd rollback service snapshots `@root-blank → @` on every boot. Skipping step 5 causes first-boot failure: the rollback service exits with an error because `@root-blank` does not exist.
+
+```bash
+# 1. Boot the NixOS minimal ISO and get a root shell.
+
+# 2. Clone NERV.nixos into the standard NixOS config location.
+mkdir -p /mnt/etc/nixos
+git clone https://github.com/atirelli3/NERV.nixos.git /mnt/etc/nixos
+cd /mnt/etc/nixos
+
+# 3. Mount the BTRFS install volume temporarily (disko will handle permanent mounts).
+#    Nothing to edit in disko.nix — the BTRFS layout is fully declared.
+#    Set the disk device in hosts/configuration.nix (step 6).
+
+# 4. Provision the disk (THIS WILL ERASE THE TARGET DISK).
+nix --experimental-features "nix-command flakes" run github:nix-community/disko/v1.13.0 -- \
+  --mode destroy,format,mount modules/system/disko.nix
+
+# 5. Create the @root-blank rollback baseline — MANDATORY before nixos-install.
+#    The initrd rollback service (Phase 10) snapshots @root-blank → @ on every boot.
+#    This step creates the clean baseline. Skipping it breaks the first boot.
+btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank
+
+# 6. Generate hardware configuration and copy it into place.
+nixos-generate-config --no-filesystems --root /mnt
+cp /mnt/etc/nixos/hardware-configuration.nix hosts/hardware-configuration.nix
+
+# 7. Edit hosts/configuration.nix — fill every PLACEHOLDER value.
+nano hosts/configuration.nix
+
+# 8. Install.
+nixos-install --flake /mnt/etc/nixos#host
+```
+
+After the first boot, NERV lives at `/etc/nixos`. Apply future changes with:
+
+```bash
+nixos-rebuild switch --flake /etc/nixos#host
+# If Home Manager is enabled (nerv.home.enable = true):
+nixos-rebuild switch --flake /etc/nixos#host --impure
+```
+
+---
+
+### C — Existing NixOS system
 
 ```bash
 # 1. Back up your current config (optional but recommended).
@@ -109,7 +156,7 @@ sudo nano hosts/configuration.nix
 sudo nixos-rebuild switch --flake /etc/nixos#host
 ```
 
-### C — Enabling Secure Boot (optional, post-install)
+### D — Enabling Secure Boot (optional, post-install)
 
 Secure Boot is disabled by default (`nerv.secureboot.enable = false`). Enable it after the system is installed and booting correctly. You need a machine with a UEFI firmware that supports Setup Mode.
 
