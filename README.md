@@ -355,10 +355,10 @@ Nix daemon configuration. Fully opaque.
 ---
 
 #### `boot.nix`
-LUKS/initrd/bootloader configuration. Fully opaque — extracted from `hosts/configuration.nix` so the host file stays minimal.
+Layout-agnostic initrd and bootloader configuration. Fully opaque — extracted from `hosts/configuration.nix` so the host file stays minimal.
 
-Contains: LUKS device unlock, initrd modules, systemd-boot configuration.
-The `NIXLUKS` label must stay in sync with `hosts/disko-configuration.nix` and `secureboot.nix`.
+Contains: initrd modules, systemd-boot configuration. Layout-conditional LUKS and initrd services live in `modules/system/disko.nix`.
+The `NIXLUKS` label must stay in sync with `modules/system/disko.nix` and `secureboot.nix`.
 
 ---
 
@@ -385,14 +385,16 @@ Per-directory tmpfs mounts with an optional full-impermanence server mode.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `nerv.impermanence.enable` | `bool` | `false` | Enable impermanence |
-| `nerv.impermanence.mode` | `"minimal"│"full"` | `"minimal"` | `minimal` = `/tmp`+`/var/tmp` as tmpfs; `full` = `/` as tmpfs, state on `/persist` |
+| `nerv.impermanence.mode` | `"btrfs"│"full"` | **required** | `btrfs` = BTRFS rollback resets `/` on each boot, state on `/persist` (@persist subvolume); `full` = `/` as tmpfs, state on `/persist` (LVM) |
 | `nerv.impermanence.persistPath` | `str` | `"/persist"` | Base path for `environment.persistence` (full mode only) |
 | `nerv.impermanence.extraDirs` | `[str]` | `[]` | Additional system paths to mount as tmpfs |
 | `nerv.impermanence.users` | `attrs` | `{}` | Per-user paths mapped to size, e.g. `{ alice."/home/alice/Downloads" = "8G"; }` |
 
+BTRFS mode persists (via `environment.persistence`): `/var/lib/nixos`, `/var/lib/systemd`, `/etc/nixos`, SSH host keys, and `machine-id`. `/var/log` is excluded (persisted by the @log BTRFS subvolume).
+
 Full mode persists: `/var/log`, `/var/lib/nixos`, `/var/lib/systemd`, `/etc/nixos`, SSH host keys, and `machine-id`.
 
-> Full mode requires `impermanence.nixosModules.impermanence` in the host's modules list (pre-wired in the `server` profile).
+> Both `btrfs` and `full` modes require `impermanence.nixosModules.impermanence` in the host's modules list (pre-wired in both the `host` and `server` profiles).
 
 ---
 
@@ -477,10 +479,9 @@ Any hardcoded setting can be overridden at the host level with `lib.mkForce`:
 
 ```
 nerv.nixos/
-├── flake.nix                    # inputs, profiles, nixosModules, nixosConfigurations
+├── flake.nix                    # inputs, profiles (host/server), nixosModules, nixosConfigurations
 ├── hosts/
 │   ├── configuration.nix        # machine identity — edit this
-│   ├── disko-configuration.nix  # declarative disk layout — edit this
 │   └── hardware-configuration.nix  # replace with nixos-generate-config output
 ├── modules/
 │   ├── default.nix              # aggregates system + services + home
@@ -490,9 +491,10 @@ nerv.nixos/
 │   │   ├── kernel.nix           # Zen kernel + hardening params
 │   │   ├── security.nix         # AppArmor, auditd, ClamAV, AIDE
 │   │   ├── nix.nix              # daemon, GC, optimise, autoUpgrade
-│   │   ├── boot.nix             # LUKS/initrd/bootloader
+│   │   ├── boot.nix             # layout-agnostic initrd + bootloader
 │   │   ├── secureboot.nix       # Lanzaboote + TPM2
-│   │   └── impermanence.nix     # tmpfs mounts, full server mode
+│   │   ├── disko.nix            # disk layout (btrfs/lvm), LUKS, initrd services
+│   │   └── impermanence.nix     # BTRFS or full impermanence mode
 │   └── services/
 │       ├── openssh.nix          # SSH + endlessh + fail2ban
 │       ├── pipewire.nix         # audio stack
