@@ -10,6 +10,8 @@
 # Override : lib.mkForce on any fileSystems.* or environment.persistence entry.
 # Note     : Both modes require impermanence.nixosModules.impermanence in the host's
 #            modules list for environment.persistence to function.
+# Profiles : hostProfile   → mode = "btrfs"  (BTRFS rollback, /persist is @persist subvolume)
+#            serverProfile → mode = "full"   (/ as tmpfs, /persist is LV)
 
 { config, lib, pkgs, ... }:
 

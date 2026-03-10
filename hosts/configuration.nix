@@ -2,8 +2,8 @@
 #
 # Purpose  : Machine identity for this NERV.nixos installation.
 # Role     : Declares machine-specific values only. All service and feature
-#            settings are controlled by the profile in flake.nix (hostProfile,
-#            serverProfile, or vmProfile).
+#            settings are controlled by the profile in flake.nix (hostProfile
+#            or serverProfile).
 # Entry    : nerv.hostname, nerv.primaryUser, nerv.hardware.*, nerv.locale.*,
 #            system.stateVersion, disko.devices.disk.main.device,
 #            nerv.disko.layout, nerv.disko.lvm.*
