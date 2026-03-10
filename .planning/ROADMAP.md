@@ -218,15 +218,20 @@ Plans:
 - [ ] 11-01-PLAN.md — Rewrite impermanence.nix: drop minimal mode, update enum to [btrfs, full], add btrfs lib.mkIf block with neededForBoot and environment.persistence
 
 ### Phase 12: Profile Wiring and Documentation
-**Goal**: All three profiles in flake.nix explicitly declare their disk layout and impermanence mode; section-header comments on modified modules reflect new options; the install procedure documents the mandatory post-disko @root-blank snapshot step
+**Goal**: hostProfile and serverProfile in flake.nix explicitly declare their disk layout and impermanence mode; vmProfile and nixosConfigurations.vm are removed; section-header comments on modified modules reflect profile cross-references; the install procedure documents the mandatory post-disko @root-blank snapshot step
 **Depends on**: Phases 10, 11
 **Requirements**: PROF-01, PROF-02, PROF-03, PROF-04
 **Success Criteria** (what must be TRUE):
   1. `hostProfile` in `flake.nix` contains `nerv.disko.layout = "btrfs"` and `nerv.impermanence.mode = "btrfs"`; `nix eval .#nixosConfigurations.host.config.nerv.disko.layout` returns `"btrfs"`
-  2. `serverProfile` and `vmProfile` in `flake.nix` each contain `nerv.disko.layout = "lvm"` explicitly; `nix eval` for server and vm layouts returns `"lvm"`
-  3. Section-header comments on `disko.nix`, `boot.nix`, and `impermanence.nix` list the new options (`nerv.disko.layout`, rollback service, `nerv.impermanence.mode = "btrfs"`) in their Options/Defaults/Override sections
-  4. The install procedure (inline comment block in `disko.nix` or README) documents: run disko, then `btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank`, then nixos-install — in that order
-**Plans**: TBD
+  2. `serverProfile` in `flake.nix` contains `nerv.disko.layout = "lvm"` explicitly; `vmProfile` and `nixosConfigurations.vm` are deleted entirely
+  3. Section-header comments on `disko.nix`, `boot.nix`, and `impermanence.nix` contain a `# Profiles :` cross-reference line naming which profile uses which layout/mode
+  4. README.md has a `### B — BTRFS layout (hostProfile)` section documenting: run disko → `btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank` → nixos-install — in that order
+**Plans**: 3 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Rewrite flake.nix profiles: add layout/mode to hostProfile and serverProfile, delete vmProfile and nixosConfigurations.vm
+- [ ] 12-02-PLAN.md — Add Profiles cross-reference lines to disko.nix, boot.nix, impermanence.nix headers; fix hosts/configuration.nix Role line
+- [ ] 12-03-PLAN.md — Update README.md: add BTRFS install section, update Profiles table, update Repository Layout, fix impermanence description
 
 ## Progress
 
@@ -248,4 +253,4 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 9. BTRFS Disko Layout | 2/2 | Complete   | 2026-03-09 |
 | 10. initrd BTRFS Rollback Service | 2/2 | Complete    | 2026-03-10 |
 | 11. Impermanence BTRFS Mode | 1/1 | Complete    | 2026-03-10 |
-| 12. Profile Wiring and Documentation | 0/TBD | Not started | - |
+| 12. Profile Wiring and Documentation | 0/3 | Not started | - |
