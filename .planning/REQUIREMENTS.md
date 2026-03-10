@@ -63,7 +63,7 @@
 - [x] **PROF-01**: `hostProfile` in `flake.nix` declares `nerv.disko.layout = "btrfs"` and `nerv.impermanence.mode = "btrfs"`
 - [x] **PROF-02**: `serverProfile` and `vmProfile` declare `nerv.disko.layout = "lvm"` explicitly
 - [x] **PROF-03**: Section-header comments on `disko.nix`, `boot.nix`, and `impermanence.nix` are updated to reflect new options and behavior
-- [ ] **PROF-04**: Install procedure documents the required post-disko manual step: `btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank` to create the clean rollback baseline
+- [x] **PROF-04**: Install procedure documents the required post-disko manual step: `btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank` to create the clean rollback baseline
 
 ## Future Requirements
 
@@ -126,7 +126,7 @@
 | PROF-01 | Phase 12 | Complete |
 | PROF-02 | Phase 12 | Complete |
 | PROF-03 | Phase 12 | Complete |
-| PROF-04 | Phase 12 | Pending |
+| PROF-04 | Phase 12 | Complete |
 
 **Coverage:**
 - v2 requirements: 12 total

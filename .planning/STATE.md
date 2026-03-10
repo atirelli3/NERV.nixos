@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-03-10T10:04:11.157Z"
+stopped_at: Completed 12-profile-wiring-and-documentation plan 03 — Phase 12 complete
+last_updated: "2026-03-10T10:06:44.471Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 12
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 31
-  completed_plans: 30
+  completed_plans: 31
   percent: 0
 ---
 
@@ -84,6 +84,7 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 11-impermanence-btrfs-mode P01 | 3 | 2 tasks | 1 files |
 | Phase 12-profile-wiring-and-documentation P01 | 1 | 1 tasks | 1 files |
 | Phase 12-profile-wiring-and-documentation P02 | 3 | 2 tasks | 4 files |
+| Phase 12-profile-wiring-and-documentation P03 | 4 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -173,6 +174,9 @@ Recent decisions affecting current work:
 - [Phase 12-profile-wiring-and-documentation]: nerv.disko.layout placed as first attribute in each profile block; vmProfile and nixosConfigurations.vm deleted cleanly (no stubs) per CONTEXT.md locked decision
 - [Phase 12-02]: Profiles cross-reference lines placed after the last line of each header's final section (LUKS, Note) — consistent insertion point across all three modules
 - [Phase 12-02]: hosts/configuration.nix Role line updated to remove vmProfile reference (profile removed in Phase 8; header was stale)
+- [Phase 12-profile-wiring-and-documentation]: Section A (LVM/disko-configuration.nix path) left unchanged — plan explicitly forbids modification; BTRFS install walkthrough in new Section B
+- [Phase 12-profile-wiring-and-documentation]: boot.nix Module Reference prose updated to reference modules/system/disko.nix — removes stale hosts/disko-configuration.nix reference from outside Section A
+- [Phase 12-profile-wiring-and-documentation]: impermanence module note broadened to cover both btrfs (host) and full (server) modes
 
 ### v2.0 Decisions (pre-phase)
 
@@ -196,7 +200,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-10T10:04:11.154Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-03-10T10:06:44.468Z
+Stopped at: Completed 12-profile-wiring-and-documentation plan 03 — Phase 12 complete
 Resume file: None
 Next action: /gsd:plan-phase 9
