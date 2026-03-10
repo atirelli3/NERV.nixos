@@ -212,7 +212,10 @@ Plans:
   1. Setting `nerv.impermanence.mode = "btrfs"` activates `environment.persistence."/persist"` with directories: `/var/lib/nixos`, `/var/lib/systemd`, `/etc/nixos`; and files: `/etc/machine-id`, `/etc/ssh/ssh_host_ed25519_key`, `/etc/ssh/ssh_host_ed25519_key.pub`, `/etc/ssh/ssh_host_rsa_key`, `/etc/ssh/ssh_host_rsa_key.pub`
   2. `/var/log` is absent from `environment.persistence."/persist".directories` in btrfs mode (it is persisted by the @log subvolume, not a bind-mount — a bind-mount would conflict)
   3. The `/persist` filesystem entry has `neededForBoot = true`, verifiable by `nixos-option fileSystems."/persist".neededForBoot` evaluating to `true`
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 11-01-PLAN.md — Rewrite impermanence.nix: drop minimal mode, update enum to [btrfs, full], add btrfs lib.mkIf block with neededForBoot and environment.persistence
 
 ### Phase 12: Profile Wiring and Documentation
 **Goal**: All three profiles in flake.nix explicitly declare their disk layout and impermanence mode; section-header comments on modified modules reflect new options; the install procedure documents the mandatory post-disko @root-blank snapshot step
@@ -244,5 +247,5 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 8. NERV.nixos Release & Multi-Profile Migration | 4/4 | Complete | 2026-03-08 |
 | 9. BTRFS Disko Layout | 2/2 | Complete   | 2026-03-09 |
 | 10. initrd BTRFS Rollback Service | 2/2 | Complete    | 2026-03-10 |
-| 11. Impermanence BTRFS Mode | 0/TBD | Not started | - |
+| 11. Impermanence BTRFS Mode | 0/1 | Not started | - |
 | 12. Profile Wiring and Documentation | 0/TBD | Not started | - |
