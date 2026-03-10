@@ -30,16 +30,17 @@
   outputs = { self, nixpkgs, lanzaboote, home-manager, disko, impermanence, ... }:
   let
     # hostProfile — classic desktop/laptop configuration.
-    # openssh, audio, bluetooth, printing enabled. Minimal impermanence (/tmp, /var/tmp as tmpfs).
+    # openssh, audio, bluetooth, printing enabled. BTRFS impermanence: rollback resets root on each boot.
     # Enable nerv.secureboot.enable = true after running sbctl enroll-keys on the target machine.
     hostProfile = {
+      nerv.disko.layout         = "btrfs";
       nerv.openssh.enable       = true;
       nerv.audio.enable         = true;
       nerv.bluetooth.enable     = true;
       nerv.printing.enable      = true;
       nerv.secureboot.enable    = false;
       nerv.impermanence.enable  = true;
-      nerv.impermanence.mode    = "minimal";
+      nerv.impermanence.mode    = "btrfs";
       nerv.zsh.enable           = true;
       nerv.home.enable          = true;
     };
@@ -48,6 +49,7 @@
     # openssh only. Full impermanence: / is tmpfs, state persisted to /persist.
     # Requires impermanence.nixosModules.impermanence in modules list (see nixosConfigurations.server).
     serverProfile = {
+      nerv.disko.layout         = "lvm";
       nerv.openssh.enable       = true;
       nerv.audio.enable         = false;
       nerv.bluetooth.enable     = false;
@@ -59,19 +61,6 @@
       nerv.home.enable          = false;
     };
 
-    # vmProfile — virtual machine configuration.
-    # Similar to host but without bluetooth or printing. No secureboot (VMs lack TPM2).
-    vmProfile = {
-      nerv.openssh.enable       = true;
-      nerv.audio.enable         = true;
-      nerv.bluetooth.enable     = false;
-      nerv.printing.enable      = false;
-      nerv.secureboot.enable    = false;
-      nerv.impermanence.enable  = true;
-      nerv.impermanence.mode    = "minimal";
-      nerv.zsh.enable           = true;
-      nerv.home.enable          = true;
-    };
   in {
     nixosModules = {
       # Aggregates system + services + home — the primary host flake entry point.
@@ -107,20 +96,6 @@
           disko.nixosModules.disko
           self.nixosModules.default
           serverProfile
-          ./hosts/configuration.nix
-        ];
-      };
-
-      # VM profile — host-like without bluetooth/printing, secureboot disabled.
-      vm = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          lanzaboote.nixosModules.lanzaboote
-          home-manager.nixosModules.home-manager
-          impermanence.nixosModules.impermanence
-          disko.nixosModules.disko
-          self.nixosModules.default
-          vmProfile
           ./hosts/configuration.nix
         ];
       };
