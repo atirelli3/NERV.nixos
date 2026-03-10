@@ -197,7 +197,11 @@ Plans:
   2. A `boot.initrd.systemd.services.rollback` unit is declared that runs after `dev-mapper-cryptroot.device`, before `sysroot.mount`, executes `btrfs subvolume delete /btrfs_tmp/@` and `btrfs subvolume snapshot -r /btrfs_tmp/@root-blank /btrfs_tmp/@`, then unmounts the temporary btrfs mount
   3. After a reboot on a BTRFS-layout system, files written to `/` during the previous session are absent (root has been reset to @root-blank state)
   4. When `nerv.disko.layout = "lvm"`, LVM initrd services (`boot.initrd.services.lvm.enable`, `preLVM = true`, `dm-snapshot` module) remain active; when layout is `"btrfs"` they are disabled
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Extend disko.nix with BTRFS initrd block, LVM initrd block, shared LUKS unlock; strip boot.nix to layout-agnostic only
+- [ ] 10-02-PLAN.md — Update section-header comments in disko.nix and boot.nix to reflect Phase 10 changes
 
 ### Phase 11: Impermanence BTRFS Mode
 **Goal**: Setting nerv.impermanence.mode = "btrfs" activates environment.persistence for the desktop profile without a tmpfs /; /persist (the @persist subvolume) is marked neededForBoot so bind-mounts are available before services start; /var/log is excluded from persistence (handled by @log subvolume)
@@ -239,6 +243,6 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 7. Flake Hardening, Disko Wiring, and Nyquist Validation | 4/4 | Complete | 2026-03-08 |
 | 8. NERV.nixos Release & Multi-Profile Migration | 4/4 | Complete | 2026-03-08 |
 | 9. BTRFS Disko Layout | 2/2 | Complete   | 2026-03-09 |
-| 10. initrd BTRFS Rollback Service | 0/TBD | Not started | - |
+| 10. initrd BTRFS Rollback Service | 0/2 | Not started | - |
 | 11. Impermanence BTRFS Mode | 0/TBD | Not started | - |
 | 12. Profile Wiring and Documentation | 0/TBD | Not started | - |
