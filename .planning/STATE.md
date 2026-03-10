@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Completed 10-01-PLAN.md (Phase 10 Plan 01)
-last_updated: "2026-03-10T08:18:17.623Z"
+stopped_at: Completed 10-02-PLAN.md (Phase 10 Plan 02)
+last_updated: "2026-03-10T08:22:09.296Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 12
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 27
-  completed_plans: 26
+  completed_plans: 27
   percent: 0
 ---
 
@@ -80,6 +80,7 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 09-btrfs-disko-layout P01 | 2 | 1 tasks | 1 files |
 | Phase 09-btrfs-disko-layout P02 | 1 | 2 tasks | 1 files |
 | Phase 10-initrd-btrfs-rollback-service P01 | 2 | 2 tasks | 2 files |
+| Phase 10-initrd-btrfs-rollback-service P02 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,9 @@ Recent decisions affecting current work:
 - [Phase 10-initrd-btrfs-rollback-service]: All layout-conditional initrd config lives in disko.nix — co-location prevents LVM initrd hang on BTRFS hosts (lvm.enable, dm-snapshot would scan for non-existent PV)
 - [Phase 10-initrd-btrfs-rollback-service]: boot.initrd.luks.devices.cryptroot declared unconditionally in disko.nix third mkMerge entry — preLVM omitted (silently ignored by systemd stage 1)
 - [Phase 10-initrd-btrfs-rollback-service]: rollback service ordering: after=dev-mapper-cryptroot.device, before=sysroot.mount — LUKS must be open before BTRFS mount attempt
+- [Phase 10-initrd-btrfs-rollback-service]: disko.nix header expanded: Purpose documents layout-conditional initrd per branch; Options lists boot.initrd.* additions; LUKS section references secureboot.nix only with @root-blank install instruction
+- [Phase 10-initrd-btrfs-rollback-service]: boot.nix LUKS section removed from header — LUKS no longer declared in boot.nix; retaining the sync comment would mislead operators
+- [Phase 10-initrd-btrfs-rollback-service]: @root-blank install instruction placed in disko.nix LUKS header section — install procedure documentation travels with the code that declares @root-blank
 
 ### v2.0 Decisions (pre-phase)
 
@@ -183,7 +187,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-10T08:18:17.621Z
-Stopped at: Completed 10-01-PLAN.md (Phase 10 Plan 01)
+Last session: 2026-03-10T08:22:09.294Z
+Stopped at: Completed 10-02-PLAN.md (Phase 10 Plan 02)
 Resume file: None
 Next action: /gsd:plan-phase 9
