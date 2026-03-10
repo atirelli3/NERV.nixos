@@ -1,8 +1,6 @@
 # modules/services/default.nix
 #
-# Purpose  : Aggregates all nerv service modules.
-# Modules  : openssh, pipewire, bluetooth, printing, zsh
-# Note     : All modules are disabled by default. Enable via nerv.<module>.enable.
+# Aggregates all nerv service modules. zsh enabled by default; all others disabled unless explicitly enabled.
 { imports = [
     ./openssh.nix
     ./pipewire.nix

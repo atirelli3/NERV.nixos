@@ -1,10 +1,6 @@
 # modules/system/security.nix
 #
-# Purpose : Security hardening — fully opaque, always-on.
-# Options : None. All settings are enforced unconditionally.
-#           Use lib.mkForce at the host level as an escape hatch only.
-# Includes: AppArmor, auditd (with baseline ruleset), ClamAV daemon+updater,
-#           AIDE file integrity monitoring (daily check timer).
+# Security hardening — AppArmor, auditd, ClamAV, and AIDE. Always-on, fully opaque.
 { config, lib, pkgs, ... }:
 
 {

@@ -1,9 +1,6 @@
 # modules/system/kernel.nix
 #
-# Purpose : Kernel selection and generic hardening parameters.
-# Options : None — fully opaque. Use lib.mkForce to override any setting.
-# Note    : CPU-specific IOMMU params (amd_iommu=on / intel_iommu=on / iommu=pt)
-#           live in hardware.nix behind nerv.hardware.cpu — they are NOT here.
+# Zen kernel and security hardening sysctl/params. Fully opaque — use lib.mkForce to override.
 
 { config, lib, pkgs, ... }:
 

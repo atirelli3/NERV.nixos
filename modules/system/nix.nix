@@ -1,9 +1,6 @@
 # modules/system/nix.nix
 #
-# Purpose : Nix daemon and nixpkgs configuration — fully opaque.
-# Options : None. GC, optimise, and autoUpgrade settings are hardcoded.
-#           autoUpgrade toggle is a v2 roadmap item (OPT-V2-01).
-# Override: Use lib.mkForce at the host level to override any setting.
+# Nix daemon configuration — flakes, GC, store optimisation, and daily auto-upgrade. Fully opaque.
 { config, lib, pkgs, ... }:
 
 {

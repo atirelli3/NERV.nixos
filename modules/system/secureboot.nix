@@ -1,13 +1,6 @@
 # modules/system/secureboot.nix
 #
-# Purpose  : Lanzaboote Secure Boot + TPM2 LUKS auto-unlock.
-# Options  : nerv.secureboot.enable (default: false)
-# Defaults : disabled — lanzaboote and TPM2 are NOT active unless explicitly enabled.
-# Override : lib.mkForce at the host level for TPM2 PCR set or sbctl path.
-# LUKS     : NIXLUKS label must stay in sync with hosts/nixos-base/disko-configuration.nix
-#            and modules/system/boot.nix.
-# Import   : Must be last in modules/system/default.nix — lib.mkForce false on
-#            systemd-boot would conflict if evaluated with ambiguous merge priority.
+# Lanzaboote Secure Boot and TPM2 LUKS auto-unlock. Disabled by default. Must be last import in system/default.nix.
 
 { config, lib, pkgs, ... }:
 let

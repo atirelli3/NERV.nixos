@@ -1,28 +1,6 @@
 # modules/system/disko.nix
 #
-# Purpose  : Declarative disk layout (GPT / EFI / LUKS) and layout-conditional initrd
-#            configuration. Supports two layout types controlled by nerv.disko.layout
-#            (no default — must be set explicitly):
-#              btrfs — GPT/LUKS/BTRFS with subvolumes (desktop/laptop);
-#                      initrd includes btrfs-progs and a systemd rollback service that
-#                      deletes @ and re-snapshots @root-blank → @ on every boot.
-#              lvm   — GPT/LUKS/LVM with swap, /nix, /persist LVs (server);
-#                      initrd enables LVM scanning and dm-snapshot kernel module.
-#            The disk device is set independently via disko.devices.disk.main.device
-#            in hosts/configuration.nix and merged here by the module system.
-#            LUKS unlock (boot.initrd.luks.devices."cryptroot") is declared here and
-#            applies to both layouts — layout-agnostic bootloader settings are in boot.nix.
-# Options  : nerv.disko.layout (enum, no default)
-#            nerv.disko.lvm.swapSize, nerv.disko.lvm.storeSize, nerv.disko.lvm.persistSize
-#            boot.initrd.supportedFilesystems (btrfs branch)
-#            boot.initrd.systemd.storePaths (btrfs branch)
-#            boot.initrd.systemd.services.rollback (btrfs branch)
-#            boot.initrd.services.lvm.enable (lvm branch)
-# LUKS     : NIXLUKS label must stay in sync with modules/system/secureboot.nix.
-#            @root-blank must be created manually after disko run, before nixos-install:
-#              btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank
-# Profiles : hostProfile   → nerv.disko.layout = "btrfs"  (see flake.nix)
-#            serverProfile → nerv.disko.layout = "lvm"    (see flake.nix)
+# Declarative disk layout and layout-conditional initrd config. btrfs (desktop) or lvm (server). No default — must be set explicitly.
 
 { config, lib, pkgs, ... }:
 

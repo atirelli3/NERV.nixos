@@ -1,10 +1,6 @@
 # modules/services/printing.nix
 #
-# Purpose  : CUPS printing daemon with network printer discovery via Avahi/mDNS.
-# Options  : nerv.printing.enable (default: false)
-# Defaults : disabled; gutenprint driver included when enabled.
-# Override : lib.mkForce on any services.printing.* or services.avahi.* setting.
-# Note     : avahi.enable is owned here so printing works independently of nerv.audio.
+# CUPS printing daemon with network printer discovery via Avahi/mDNS. Disabled by default.
 
 { config, lib, pkgs, ... }:
 

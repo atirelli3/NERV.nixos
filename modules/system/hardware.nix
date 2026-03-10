@@ -1,12 +1,6 @@
 # modules/system/hardware.nix
 #
-# Purpose : CPU microcode, GPU drivers, and hardware-agnostic firmware.
-# Options : nerv.hardware.cpu (enum: amd | intel | other, default "other")
-#           nerv.hardware.gpu (enum: amd | nvidia | intel | none, default "none")
-# Defaults: cpu = "other" (no microcode, no IOMMU params); gpu = "none" (no driver config)
-# Override: Use lib.mkForce at the host level to change any unconditional setting.
-# Note    : hardware.nvidia.open = true targets Turing+ (RTX 20xx+).
-#           Maxwell/Pascal users must override: hardware.nvidia.open = lib.mkForce false;
+# CPU microcode, GPU drivers, and hardware-agnostic firmware. cpu defaults to "other"; gpu defaults to "none".
 
 { config, lib, pkgs, ... }:
 let

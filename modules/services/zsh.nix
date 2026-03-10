@@ -1,20 +1,17 @@
 # modules/services/zsh.nix
 #
-# Purpose  : Zsh system shell with history management, key bindings, aliases, and fzf integration.
-# Options  : nerv.zsh.enable (default: false)
-# Defaults : disabled; histSize = 10000; syntaxHighlighting sourced manually to enforce load order.
-# Override : lib.mkForce on any programs.zsh.* setting.
-# Note     : syntaxHighlighting.enable is set false in the NixOS wrapper and sourced manually in
-#            interactiveShellInit to enforce load order:
-#            autosuggestions -> syntax-highlighting -> history-substring-search.
-#            NixOS aliases target /etc/nixos#host.
+# Zsh system shell with history, keybindings, aliases, and fzf integration. Enabled by default.
 
 { config, lib, pkgs, ... }:
 
 let
   cfg = config.nerv.zsh;
 in {
-  options.nerv.zsh.enable = lib.mkEnableOption "Zsh system shell with keybindings, aliases, and fzf integration";
+  options.nerv.zsh.enable = lib.mkOption {
+    type    = lib.types.bool;
+    default = true;
+    description = "Zsh system shell with keybindings, aliases, and fzf integration.";
+  };
 
   config = lib.mkIf cfg.enable {
     users.defaultUserShell    = pkgs.zsh;

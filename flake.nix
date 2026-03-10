@@ -29,36 +29,36 @@
 
   outputs = { self, nixpkgs, lanzaboote, home-manager, disko, impermanence, ... }:
   let
-    # hostProfile — classic desktop/laptop configuration.
-    # openssh, audio, bluetooth, printing enabled. BTRFS impermanence: rollback resets root on each boot.
-    # Enable nerv.secureboot.enable = true after running sbctl enroll-keys on the target machine.
-    hostProfile = {
-      nerv.disko.layout         = "btrfs";
+    # Classic desktop/laptop configuration.
+    # Defaults applied: nerv.zsh.enable = true, nerv.home.enable = true.
+    host = {
+      nerv.disko.layout         = "btrfs";  # "btrfs" for desktop/laptop | "lvm" for server
       nerv.openssh.enable       = true;
       nerv.audio.enable         = true;
       nerv.bluetooth.enable     = true;
       nerv.printing.enable      = true;
-      nerv.secureboot.enable    = false;
+      nerv.secureboot.enable    = false;    # Enable after running sbctl enroll-keys on the target machine.
       nerv.impermanence.enable  = true;
-      nerv.impermanence.mode    = "btrfs";
-      nerv.zsh.enable           = true;
-      nerv.home.enable          = true;
-    };
+      nerv.impermanence.mode    = "btrfs";  # "btrfs" (BTRFS rollback) | "full" (/ as tmpfs, server)
 
-    # serverProfile — headless server configuration.
-    # openssh only. Full impermanence: / is tmpfs, state persisted to /persist.
-    # Requires impermanence.nixosModules.impermanence in modules list (see nixosConfigurations.server).
-    serverProfile = {
-      nerv.disko.layout         = "lvm";
-      nerv.openssh.enable       = true;
-      nerv.audio.enable         = false;
-      nerv.bluetooth.enable     = false;
-      nerv.printing.enable      = false;
-      nerv.secureboot.enable    = false;
-      nerv.impermanence.enable  = true;
-      nerv.impermanence.mode    = "full";
-      nerv.zsh.enable           = true;
-      nerv.home.enable          = false;
+      # ── Available options (showing defaults) ────────────────────────────────
+      # nerv.home.users                   = [];     # users to wire Home Manager for (e.g. [ "alice" "bob" ])
+      #
+      # nerv.openssh.port                 = 2222;   # SSH daemon port (port 22 is reserved for the tarpit)
+      # nerv.openssh.tarpitPort           = 22;     # endlessh tarpit port
+      # nerv.openssh.allowUsers           = [];     # restrict SSH to specific users; empty = all users
+      # nerv.openssh.passwordAuth         = false;  # allow password auth (key-based only by default)
+      # nerv.openssh.kbdInteractiveAuth   = false;
+      #
+      # nerv.impermanence.persistPath     = "/persist"; # persistence base path
+      # nerv.impermanence.extraDirs       = [];         # extra system paths to mount as tmpfs
+      # nerv.impermanence.users           = {};         # per-user tmpfs mounts
+      #                                                 # e.g. { alice = { "/home/alice/Videos" = "8G"; }; }
+      #
+      # # LVM layout options — only relevant when nerv.disko.layout = "lvm"
+      # nerv.disko.lvm.swapSize           = "16G"; # swap LV size (2x RAM; check with: free -h)
+      # nerv.disko.lvm.storeSize          = "60G"; # /nix LV size
+      # nerv.disko.lvm.persistSize        = "20G"; # /persist LV size
     };
 
   in {
@@ -72,7 +72,7 @@
     };
 
     nixosConfigurations = {
-      # Desktop/laptop profile — openssh, audio, bluetooth, printing, minimal impermanence.
+      # Desktop/laptop — openssh, audio, bluetooth, printing, BTRFS impermanence.
       host = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
@@ -81,21 +81,7 @@
           impermanence.nixosModules.impermanence
           disko.nixosModules.disko
           self.nixosModules.default
-          hostProfile
-          ./hosts/configuration.nix
-        ];
-      };
-
-      # Headless server profile — openssh only, full impermanence (/ tmpfs, /persist state).
-      server = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          lanzaboote.nixosModules.lanzaboote
-          home-manager.nixosModules.home-manager
-          impermanence.nixosModules.impermanence  # required for environment.persistence (mode = "full")
-          disko.nixosModules.disko
-          self.nixosModules.default
-          serverProfile
+          host
           ./hosts/configuration.nix
         ];
       };

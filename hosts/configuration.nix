@@ -1,15 +1,6 @@
 # hosts/configuration.nix
 #
-# Purpose  : Machine identity for this NERV.nixos installation.
-# Role     : Declares machine-specific values only. All service and feature
-#            settings are controlled by the profile in flake.nix (hostProfile
-#            or serverProfile).
-# Entry    : nerv.hostname, nerv.primaryUser, nerv.hardware.*, nerv.locale.*,
-#            system.stateVersion, disko.devices.disk.main.device,
-#            nerv.disko.layout, nerv.disko.lvm.*
-# Override : Edit this file. Replace all PLACEHOLDER values before first boot.
-# Note     : hardware-configuration.nix is a placeholder — replace with the
-#            output of nixos-generate-config on the target machine.
+# Machine-specific identity — hostname, locale, hardware, and disk device. Replace all PLACEHOLDER values.
 { config, pkgs, ... }:
 
 {

@@ -1,9 +1,6 @@
 # modules/system/default.nix
 #
-# Purpose  : Aggregates all nerv system modules.
-# Modules  : identity, hardware, kernel, security, nix, packages, boot, impermanence, disko, secureboot
-# Note     : secureboot.nix must be last — it applies lib.mkForce false on systemd-boot
-#            to prevent conflict with Lanzaboote. Import order is significant.
+# Aggregates all nerv system modules. secureboot.nix must be last — applies lib.mkForce false on systemd-boot.
 { imports = [
     ./identity.nix
     ./hardware.nix

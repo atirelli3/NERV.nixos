@@ -1,11 +1,6 @@
 # modules/services/pipewire.nix
 #
-# Purpose  : PipeWire audio stack with ALSA, PulseAudio compat, and AirPlay sink.
-# Options  : nerv.audio.enable (default: false)
-# Defaults : disabled — no audio stack unless explicitly enabled.
-# Override : lib.mkForce on any services.pipewire.* setting.
-# Note     : Reduced-latency defaults (1024/48000 ≈ 21ms). Increase quantum
-#            if crackling occurs. For audio production, lower to 64 or 32.
+# PipeWire audio stack with ALSA, PulseAudio compat, and AirPlay sink. Disabled by default.
 
 { config, lib, pkgs, ... }:
 

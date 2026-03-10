@@ -1,20 +1,7 @@
 # home/default.nix
 #
-# Purpose  : Wires Home Manager as a NixOS module for each user in nerv.home.users.
-# Convention: Each listed user owns ~/home.nix. nerv imports it automatically.
-#             The user's ~/home.nix does NOT need to set home.stateVersion.
-# Options  : nerv.home.enable, nerv.home.users
-# Defaults : enable = false; users = []
-# Override : lib.mkForce on any home-manager.* setting.
-# Note     : nixos-rebuild requires --impure because /home/<name>/home.nix is
-#            outside the flake boundary.
-#
-# User prerequisite: ~/home.nix must exist before nixos-rebuild --impure is run.
-# Minimal ~/home.nix:
-#   { pkgs, ... }: {
-#     home.username    = "<name>";
-#     home.homeDirectory = "/home/<name>";
-#   }
+# Wires Home Manager as a NixOS module for each user in nerv.home.users. Enabled by default.
+# Each user must maintain ~/home.nix. nixos-rebuild requires --impure (file outside flake boundary).
 
 { config, lib, pkgs, ... }:
 
@@ -22,7 +9,11 @@ let
   cfg = config.nerv.home;
 in {
   options.nerv.home = {
-    enable = lib.mkEnableOption "Home Manager NixOS module wiring";
+    enable = lib.mkOption {
+      type    = lib.types.bool;
+      default = true;
+      description = "Wires Home Manager as a NixOS module for users in nerv.home.users.";
+    };
 
     users = lib.mkOption {
       type        = lib.types.listOf lib.types.str;

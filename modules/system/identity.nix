@@ -1,10 +1,6 @@
 # modules/system/identity.nix
 #
-# Purpose : Machine hostname, locale, and primary user declaration.
-# Options : nerv.hostname (required), nerv.locale.{timeZone,defaultLocale,keyMap},
-#           nerv.primaryUser (list of strings)
-# Defaults: locale defaults to UTC / en_US.UTF-8 / us; primaryUser defaults to []
-# Override: Use lib.mkForce at the host level for any value set here.
+# Machine hostname, locale, and primary user declaration.
 
 { config, lib, pkgs, ... }:
 

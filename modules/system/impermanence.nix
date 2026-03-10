@@ -1,17 +1,6 @@
 # modules/system/impermanence.nix
 #
-# Purpose  : Selective persistence via environment.persistence bind-mounts from /persist.
-#            btrfs mode — for desktop/laptop: BTRFS rollback resets root on each boot;
-#            /persist (@persist subvolume) holds state. No tmpfs /.
-#            full mode  — for server: / as tmpfs; /persist holds state.
-# Options  : nerv.impermanence.enable, mode, persistPath, extraDirs, users
-# Defaults : enable = false; persistPath = "/persist"; extraDirs = []; users = {}
-#            mode has NO default — must be declared explicitly per host.
-# Override : lib.mkForce on any fileSystems.* or environment.persistence entry.
-# Note     : Both modes require impermanence.nixosModules.impermanence in the host's
-#            modules list for environment.persistence to function.
-# Profiles : hostProfile   → mode = "btrfs"  (BTRFS rollback, /persist is @persist subvolume)
-#            serverProfile → mode = "full"   (/ as tmpfs, /persist is LV)
+# Selective persistence via environment.persistence bind-mounts. btrfs mode for desktop; full mode for server.
 
 { config, lib, pkgs, ... }:
 

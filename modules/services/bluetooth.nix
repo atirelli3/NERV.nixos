@@ -1,10 +1,6 @@
 # modules/services/bluetooth.nix
 #
-# Purpose  : Bluetooth hardware, management tools, PipeWire audio integration, and OBEX file transfer.
-# Options  : nerv.bluetooth.enable (default: false)
-# Defaults : disabled.
-# Override : lib.mkForce on any hardware.bluetooth.* or services.pipewire.wireplumber.* setting.
-# Note     : WirePlumber config is applied unconditionally — no effect if PipeWire is not enabled.
+# Bluetooth hardware, management tools, PipeWire integration, and OBEX file transfer. Disabled by default.
 
 { config, lib, pkgs, ... }:
 

@@ -1,15 +1,6 @@
 # modules/services/openssh.nix
 #
-# Purpose  : SSH daemon hardened with endlessh tarpit and fail2ban.
-# Options  : nerv.openssh.enable, nerv.openssh.port, nerv.openssh.tarpitPort,
-#            nerv.openssh.allowUsers, nerv.openssh.passwordAuth,
-#            nerv.openssh.kbdInteractiveAuth
-# Defaults : enable = false; port = 2222; tarpitPort = 22; allowUsers = []
-#            passwordAuth = false; kbdInteractiveAuth = false
-# Override : lib.mkForce on any services.openssh.* or services.fail2ban.* setting.
-# Note     : Port 22 is reserved for the endlessh tarpit. Connect with ssh -p <port>.
-#            allowUsers guard: empty list means "all users" in sshd — never emit
-#            AllowUsers when the list is empty (lib.optionalAttrs guard enforces this).
+# SSH daemon hardened with endlessh tarpit and fail2ban. Disabled by default.
 
 { config, lib, pkgs, ... }:
 
