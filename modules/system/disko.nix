@@ -1,17 +1,19 @@
 # modules/system/disko.nix
 #
-# Purpose  : Declarative disk layout (GPT / EFI / LUKS). Supports two layout types
-#            controlled by nerv.disko.layout (no default — must be set explicitly):
-#              btrfs — GPT/LUKS/BTRFS with subvolumes (desktop/laptop)
+# Purpose  : Declarative disk layout (GPT / EFI / LUKS) AND all layout-conditional
+#            initrd configuration. Supports two layout types controlled by
+#            nerv.disko.layout (no default — must be set explicitly):
+#              btrfs — GPT/LUKS/BTRFS with subvolumes + rollback service (desktop/laptop)
 #              lvm   — GPT/LUKS/LVM with swap, /nix, /persist LVs (server)
 #            The disk device is set independently via disko.devices.disk.main.device
 #            in hosts/configuration.nix and merged here by the module system.
 # Options  : nerv.disko.layout (enum, no default)
 #            nerv.disko.lvm.swapSize, nerv.disko.lvm.storeSize, nerv.disko.lvm.persistSize
-# LUKS     : NIXLUKS label must stay in sync with modules/system/boot.nix
-#            and modules/system/secureboot.nix.
+# LUKS     : NIXLUKS label must stay in sync with modules/system/secureboot.nix.
+#            boot.initrd.luks.devices."cryptroot" is declared here (unconditional)
+#            and must NOT be re-declared in boot.nix.
 
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg     = config.nerv.disko;
@@ -117,6 +119,29 @@ in {
           };
         };
       };
+
+      # BTRFS initrd: filesystem driver + rollback service
+      boot.initrd.supportedFilesystems = [ "btrfs" ];
+      boot.initrd.systemd.storePaths   = [ pkgs.btrfs-progs ];
+
+      boot.initrd.systemd.services.rollback = {
+        description = "Rollback BTRFS root subvolume to a pristine state";
+        wantedBy    = [ "initrd.target" ];
+        after       = [ "dev-mapper-cryptroot.device" ];
+        before      = [ "sysroot.mount" ];
+        unitConfig.DefaultDependencies = "no";
+        serviceConfig.Type = "oneshot";
+        script = ''
+          mkdir -p /btrfs_tmp
+          mount -o subvol=/ /dev/mapper/cryptroot /btrfs_tmp
+          if [ -e /btrfs_tmp/@ ]; then
+            ${pkgs.btrfs-progs}/bin/btrfs subvolume delete /btrfs_tmp/@ || true
+          fi
+          ${pkgs.btrfs-progs}/bin/btrfs subvolume snapshot \
+            /btrfs_tmp/@root-blank /btrfs_tmp/@
+          umount /btrfs_tmp
+        '';
+      };
     })
 
     # ── LVM branch (server-only) ──────────────────────────────────────────
@@ -168,7 +193,23 @@ in {
           };
         };
       };
+
+      # LVM initrd: LVM activation and dm-snapshot support
+      boot.initrd.services.lvm.enable = true;
+      boot.initrd.kernelModules       = [ "dm-snapshot" "cryptd" ];
     })
+
+    # ── Shared: LUKS unlock (both layouts) ───────────────────────────────
+    # Both BTRFS and LVM layouts use the same outer LUKS container.
+    # Label NIXLUKS must stay in sync with sharedLuksOuter.extraFormatArgs
+    # and modules/system/secureboot.nix.
+    {
+      boot.initrd.luks.devices."cryptroot" = {
+        device        = "/dev/disk/by-label/NIXLUKS";  # must match sharedLuksOuter.extraFormatArgs and secureboot.nix
+        allowDiscards = true;                           # TRIM pass-through for SSDs
+        # preLVM is silently ignored by systemd stage 1 — omit here
+      };
+    }
 
   ];
 }
