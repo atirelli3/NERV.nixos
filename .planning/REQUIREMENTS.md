@@ -49,9 +49,9 @@
 
 ### Boot / Rollback (BOOT)
 
-- [ ] **BOOT-01**: When `nerv.disko.layout = "btrfs"`, initrd includes btrfs-progs via `boot.initrd.supportedFilesystems = ["btrfs"]` and `boot.initrd.systemd.storePaths = [pkgs.btrfs-progs]`
-- [ ] **BOOT-02**: When `nerv.disko.layout = "btrfs"`, a `boot.initrd.systemd.services.rollback` unit runs after `dev-mapper-cryptroot.device`, before `sysroot.mount`, deletes `@`, and snapshots `@root-blank → @` — resetting root on every reboot
-- [ ] **BOOT-03**: LVM initrd services (`boot.initrd.services.lvm.enable`, `preLVM = true`, `dm-snapshot` kernel module) are only active when `nerv.disko.layout = "lvm"` — disabled for BTRFS to prevent initrd hang on a device with no LVM PV
+- [x] **BOOT-01**: When `nerv.disko.layout = "btrfs"`, initrd includes btrfs-progs via `boot.initrd.supportedFilesystems = ["btrfs"]` and `boot.initrd.systemd.storePaths = [pkgs.btrfs-progs]`
+- [x] **BOOT-02**: When `nerv.disko.layout = "btrfs"`, a `boot.initrd.systemd.services.rollback` unit runs after `dev-mapper-cryptroot.device`, before `sysroot.mount`, deletes `@`, and snapshots `@root-blank → @` — resetting root on every reboot
+- [x] **BOOT-03**: LVM initrd services (`boot.initrd.services.lvm.enable`, `preLVM = true`, `dm-snapshot` kernel module) are only active when `nerv.disko.layout = "lvm"` — disabled for BTRFS to prevent initrd hang on a device with no LVM PV
 
 ### Persistence (PERSIST)
 
@@ -118,9 +118,9 @@
 | DISKO-01 | Phase 9 | Complete |
 | DISKO-02 | Phase 9 | Complete |
 | DISKO-03 | Phase 9 | Complete |
-| BOOT-01 | Phase 10 | Pending |
-| BOOT-02 | Phase 10 | Pending |
-| BOOT-03 | Phase 10 | Pending |
+| BOOT-01 | Phase 10 | Complete |
+| BOOT-02 | Phase 10 | Complete |
+| BOOT-03 | Phase 10 | Complete |
 | PERSIST-01 | Phase 11 | Pending |
 | PERSIST-02 | Phase 11 | Pending |
 | PROF-01 | Phase 12 | Pending |

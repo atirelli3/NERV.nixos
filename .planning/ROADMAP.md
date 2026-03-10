@@ -243,6 +243,6 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 7. Flake Hardening, Disko Wiring, and Nyquist Validation | 4/4 | Complete | 2026-03-08 |
 | 8. NERV.nixos Release & Multi-Profile Migration | 4/4 | Complete | 2026-03-08 |
 | 9. BTRFS Disko Layout | 2/2 | Complete   | 2026-03-09 |
-| 10. initrd BTRFS Rollback Service | 0/2 | Not started | - |
+| 10. initrd BTRFS Rollback Service | 1/2 | In Progress|  |
 | 11. Impermanence BTRFS Mode | 0/TBD | Not started | - |
 | 12. Profile Wiring and Documentation | 0/TBD | Not started | - |
