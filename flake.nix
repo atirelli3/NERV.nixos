@@ -90,11 +90,10 @@
           lanzaboote.nixosModules.lanzaboote
           home-manager.nixosModules.home-manager
           impermanence.nixosModules.impermanence
+          disko.nixosModules.disko
           self.nixosModules.default
           hostProfile
           ./hosts/configuration.nix
-          disko.nixosModules.disko
-          ./hosts/disko-host.nix
         ];
       };
 
@@ -105,11 +104,10 @@
           lanzaboote.nixosModules.lanzaboote
           home-manager.nixosModules.home-manager
           impermanence.nixosModules.impermanence  # required for environment.persistence (mode = "full")
+          disko.nixosModules.disko
           self.nixosModules.default
           serverProfile
           ./hosts/configuration.nix
-          disko.nixosModules.disko
-          ./hosts/disko-configuration.nix
         ];
       };
 
@@ -120,11 +118,10 @@
           lanzaboote.nixosModules.lanzaboote
           home-manager.nixosModules.home-manager
           impermanence.nixosModules.impermanence
+          disko.nixosModules.disko
           self.nixosModules.default
           vmProfile
           ./hosts/configuration.nix
-          disko.nixosModules.disko
-          ./hosts/disko-host.nix
         ];
       };
     };

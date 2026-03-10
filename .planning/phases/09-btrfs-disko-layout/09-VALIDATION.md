@@ -44,7 +44,7 @@ created: 2026-03-09
 | 9-01-04 | 01 | 1 | DISKO-03 | smoke | `grep -c 'type = "swap"' modules/system/disko.nix` inside isBtrfs — expect 0 | ✅ | ⬜ pending |
 | 9-02-01 | 02 | 1 | DISKO-02 | smoke | `nix-instantiate --parse modules/system/disko.nix` | ✅ | ⬜ pending |
 | 9-02-02 | 02 | 1 | DISKO-02 | smoke | `grep -c 'lvm_vg' modules/system/disko.nix` (expect ≥1 inside isLvm block) | ✅ | ⬜ pending |
-| 9-03-01 | 03 | 2 | DISKO-01,02,03 | smoke | `nix flake check /home/demon/Developments/nerv.nixos` | ✅ | ⬜ pending |
+| 9-02-03 | 02 | 2 | DISKO-01,02,03 | smoke | `nix flake check /home/demon/Developments/nerv.nixos` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
