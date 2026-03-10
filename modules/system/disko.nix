@@ -21,6 +21,8 @@
 # LUKS     : NIXLUKS label must stay in sync with modules/system/secureboot.nix.
 #            @root-blank must be created manually after disko run, before nixos-install:
 #              btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank
+# Profiles : hostProfile   → nerv.disko.layout = "btrfs"  (see flake.nix)
+#            serverProfile → nerv.disko.layout = "lvm"    (see flake.nix)
 
 { config, lib, pkgs, ... }:
 

@@ -8,6 +8,8 @@
 # Note    : boot.kernelPackages = pkgs.linuxPackages_latest is set here but
 #           overridden by kernel.nix (lib.mkForce pkgs.linuxPackages_zen) —
 #           kernel.nix is the authoritative source for the kernel package.
+# Profiles : Used by both hostProfile (btrfs layout) and serverProfile (lvm layout).
+#            Layout-conditional initrd config lives in disko.nix, not here.
 
 { pkgs, ... }:
 
