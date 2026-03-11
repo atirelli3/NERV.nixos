@@ -18,22 +18,36 @@
   security.apparmor.enable = true;
 
   # System call auditing — logs to /var/log/audit/audit.log.
+  # security.audit (the NixOS rule-loader module) is intentionally not used:
+  # it generates -b/-f/-r auditctl flags that were removed in audit 4.x,
+  # causing audit-rules-nixos.service to always fail. Individual -a/-w commands
+  # still work fine and are loaded below via a custom oneshot service.
   security.auditd.enable = true;
-  security.audit = {
-    enable = true;
-    rules = [
-      # Process and file activity
-      "-a exit,always -F arch=b64 -S execve"            # all process executions
-      "-a exit,always -F arch=b64 -S openat"            # all file opens
-      "-a exit,always -F arch=b64 -S connect"           # outbound network connections
-      # Privilege escalation attempts
-      "-a exit,always -F arch=b64 -S setuid -S setgid"  # UID/GID changes
-      # Critical file modifications
-      "-w /etc/passwd -p wa"                             # user database
-      "-w /etc/shadow -p wa"                             # password hashes
-      "-w /etc/sudoers -p wa"                            # sudo rules
-      "-w /etc/ssh/sshd_config -p wa"                   # SSH daemon config
-    ];
+
+  systemd.services.audit-rules = {
+    description = "Load Audit Rules";
+    after       = [ "auditd.service" ];
+    wantedBy    = [ "multi-user.target" ];
+    serviceConfig = {
+      Type            = "oneshot";
+      RemainAfterExit = true;
+      ExecStart       = pkgs.writeShellScript "audit-rules-load" ''
+        ${pkgs.audit}/bin/auditctl -D
+        # Process and file activity — scoped to logged-in users (auid>=1000) to avoid
+        # audit_log_subj_ctx errors from kernel/system processes without AppArmor labels.
+        ${pkgs.audit}/bin/auditctl -a always,exit -F arch=b64 -S execve  -F auid>=1000 -F auid!=-1
+        ${pkgs.audit}/bin/auditctl -a always,exit -F arch=b64 -S openat  -F auid>=1000 -F auid!=-1
+        ${pkgs.audit}/bin/auditctl -a always,exit -F arch=b64 -S connect -F auid>=1000 -F auid!=-1
+        # Privilege escalation — all users including system (uid change is always relevant)
+        ${pkgs.audit}/bin/auditctl -a always,exit -F arch=b64 -S setuid -S setgid
+        # Critical file modifications
+        ${pkgs.audit}/bin/auditctl -a always,exit -F path=/etc/passwd       -F perm=wa
+        ${pkgs.audit}/bin/auditctl -a always,exit -F path=/etc/shadow       -F perm=wa
+        ${pkgs.audit}/bin/auditctl -a always,exit -F path=/etc/sudoers      -F perm=wa
+        ${pkgs.audit}/bin/auditctl -a always,exit -F path=/etc/ssh/sshd_config -F perm=wa
+      '';
+      ExecStop = "${pkgs.audit}/bin/auditctl -D";
+    };
   };
 
   # ClamAV antivirus via the NixOS module (handles user, socket, and paths correctly).

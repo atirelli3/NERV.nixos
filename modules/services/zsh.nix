@@ -115,6 +115,12 @@ in {
         bindkey '^[[F'  end-of-line
         bindkey '^[[3~' delete-char
 
+        # Fall back to xterm-256color when the connecting terminal's TERM entry
+        # is not present in the server's terminfo database (e.g. xterm-ghostty).
+        if ! infocmp "$TERM" &>/dev/null 2>&1; then
+          export TERM=xterm-256color
+        fi
+
         # fzf — fuzzy completion (**<TAB>) and key bindings:
         #   Ctrl+T  fuzzy-find file and paste to command line
         #   Ctrl+R  fuzzy search command history
@@ -134,6 +140,20 @@ in {
         }
         zle -N sudo-command-line
         bindkey '^[^[' sudo-command-line
+      '';
+    };
+
+    # Create an empty ~/.zshrc for every user whose login shell is zsh so that
+    # the zsh-newuser-install wizard is never triggered on first login.
+    # The file is left empty intentionally — system config lives in /etc/zshrc.
+    system.activationScripts.zshDefaultRc = {
+      supportsDryActivation = false;
+      text = ''
+        while IFS=: read -r user _ _ _ _ home shell; do
+          if [[ "$shell" == */zsh ]] && [[ -d "$home" ]] && [[ ! -f "$home/.zshrc" ]]; then
+            install -m644 -o "$user" /dev/null "$home/.zshrc"
+          fi
+        done < /etc/passwd
       '';
     };
 
