@@ -188,17 +188,5 @@ in {
       boot.initrd.kernelModules       = [ "dm-snapshot" "cryptd" ];
     })
 
-    # ── Shared: LUKS unlock (both layouts) ───────────────────────────────
-    # Both BTRFS and LVM layouts use the same outer LUKS container.
-    # Label NIXLUKS must stay in sync with sharedLuksOuter.extraFormatArgs
-    # and modules/system/secureboot.nix.
-    {
-      boot.initrd.luks.devices."cryptroot" = {
-        device        = "/dev/disk/by-label/NIXLUKS";  # must match sharedLuksOuter.extraFormatArgs and secureboot.nix
-        allowDiscards = true;                           # TRIM pass-through for SSDs
-        # preLVM is silently ignored by systemd stage 1 — omit here
-      };
-    }
-
   ];
 }

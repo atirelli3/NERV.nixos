@@ -13,8 +13,10 @@ in {
   config = lib.mkIf cfg.enable {
     # Lanzaboote supersedes systemd-boot; the NixOS-generated entry must be disabled.
     boot.loader.systemd-boot.enable = lib.mkForce false;
-    # Configure the initrd LUKS unlock to use TPM2 bound to PCRs 0+7.
-    boot.initrd.luks.devices."cryptroot".crypttabExtraOpts = [ "tpm2-device=auto" "tpm2-pcrs=0+7" ];
+    # Configure the initrd LUKS unlock to use TPM2 bound to PCR 7 (Secure Boot policy).
+    # PCR 7 alone is sufficient: SB already prevents unsigned kernels from booting.
+    # PCR 0 (firmware) is omitted — it breaks auto-unlock on every firmware update.
+    boot.initrd.luks.devices."cryptroot".crypttabExtraOpts = [ "tpm2-device=auto" "tpm2-pcrs=7" ];
     boot.lanzaboote = {
       enable = true;
       pkiBundle = "/var/lib/sbctl";
@@ -106,7 +108,7 @@ in {
           ${pkgs.systemd}/bin/systemd-cryptenroll \
             --wipe-slot=tpm2   \
             --tpm2-device=auto \
-            --tpm2-pcrs=0+7    \
+            --tpm2-pcrs=7    \
             /dev/disk/by-label/${luksDevice01}  # must match disko-configuration.nix and boot.nix
         else
           echo "secureboot [2/2]: TPM2 slot already enrolled, skipping"
@@ -131,14 +133,14 @@ in {
         #   luksDevice03 = "BEEGLUKS02";
         # in ''
         #   ...
-        #   sudo systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto --tpm2-pcrs=0+7 /dev/disk/by-label/${luksDevice02}
-        #   sudo systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto --tpm2-pcrs=0+7 /dev/disk/by-label/${luksDevice03}
+        #   sudo systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto --tpm2-pcrs=7 /dev/disk/by-label/${luksDevice02}
+        #   sudo systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto --tpm2-pcrs=7 /dev/disk/by-label/${luksDevice03}
         # '';
 
         text = let
           luksDevice01 = "NIXLUKS";  # must match disko-configuration.nix and boot.nix
         in ''
-          sudo systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto --tpm2-pcrs=0+7 /dev/disk/by-label/${luksDevice01}
+          sudo systemd-cryptenroll --wipe-slot=tpm2 --tpm2-device=auto --tpm2-pcrs=7 /dev/disk/by-label/${luksDevice01}
         '';
       };
     in [

@@ -62,10 +62,10 @@ in {
 
     # Graphical PipeWire tools (GTK4 / libadwaita).
     #   pwvucontrol — per-app volume control and device management (replaces pavucontrol)
-    #   helvum      — patchbay for routing streams between sources and sinks
+    #   crosspipe   — patchbay for routing streams between sources and sinks (replaces helvum)
     environment.systemPackages = with pkgs; [
       pwvucontrol
-      helvum
+      crosspipe
     ];
   };
 }

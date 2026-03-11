@@ -52,59 +52,103 @@ Two profiles are defined in `flake.nix`. Pick the one that matches your target:
 
 ## Installation
 
-### A — New system (NixOS Live ISO, LVM layout)
+> For the full step-by-step guide including all scenarios, troubleshooting, and post-install checklist, see [docs/installation.md](docs/installation.md).
+
+### A — New system (BTRFS layout, `host` profile)
+
+Desktop/laptop with BTRFS rollback impermanence.
 
 ```bash
-# 1. Boot the NixOS minimal ISO and get a root shell.
+# 1. Boot the NixOS minimal ISO.
 
-# 2. Clone NERV.nixos into the standard NixOS config location.
-mkdir -p /mnt/etc/nixos
-git clone https://github.com/atirelli3/NERV.nixos.git /mnt/etc/nixos
-cd /mnt/etc/nixos
+# 2. Clone to the live-ISO ramdisk (NOT /mnt — disko will wipe /mnt during provisioning).
+git clone https://github.com/atirelli3/NERV.nixos.git /tmp/nixos
 
-# 3. Provision the disk (THIS WILL ERASE THE TARGET DISK).
-nix --experimental-features "nix-command flakes" run github:nix-community/disko/v1.13.0 -- \
-  --mode destroy,format,mount hosts/disko-configuration.nix
+# 3. Fill every value in the host config.
+nano /tmp/nixos/hosts/configuration.nix
 
-# 4. Generate hardware configuration and copy it into place.
-nixos-generate-config --no-filesystems --root /mnt
-cp /mnt/etc/nixos/hardware-configuration.nix hosts/hardware-configuration.nix
+# 4. (Optional) Enable Secure Boot during install — skip to enable it post-install instead.
+nano /tmp/nixos/flake.nix
+#   nerv.secureboot.enable = true;
 
-# 5. Edit hosts/configuration.nix — fill every PLACEHOLDER value.
-nano hosts/configuration.nix
+# 5. Set the LUKS encryption password (disko reads this during formatting).
+echo -n "your-luks-password" > /tmp/luks-password
 
-# 6. Install.
-nixos-install --flake /mnt/etc/nixos#host   # or #server
+# 6. Provision the disk — THIS ERASES THE TARGET DISK. Must run as sudo.
+sudo nix --experimental-features "nix-command flakes" \
+  run github:nix-community/disko/v1.13.0 -- \
+  --mode destroy,format,mount --flake /tmp/nixos#host
+
+# 7. Copy the configured repo to the target filesystem.
+sudo mkdir -p /mnt/etc
+sudo cp -r /tmp/nixos /mnt/etc/nixos
+
+# 8. Generate hardware configuration.
+sudo nixos-generate-config --no-filesystems --show-hardware-config \
+  | sudo tee /mnt/etc/nixos/hosts/hardware-configuration.nix
+
+# 9. If Secure Boot was enabled in step 4 — create and place sbctl keys.
+nix-shell -p sbctl --run "sudo sbctl create-keys"
+sudo mkdir -p /mnt/var/lib/sbctl /mnt/persist/var/lib/sbctl
+sudo cp -r /var/lib/sbctl/. /mnt/var/lib/sbctl/
+sudo cp -r /var/lib/sbctl/. /mnt/persist/var/lib/sbctl/
+
+# 10. Stage files and install.
+sudo git -C /mnt/etc/nixos add -A
+sudo nixos-install --flake /mnt/etc/nixos#host
+
+# 11. Set your user password (nixos-install only prompts for root).
+sudo nixos-enter --root /mnt
+passwd <username>
+exit
+
+# 12. Copy config to /persist so it survives the first BTRFS rollback.
+sudo cp -rT /mnt/etc/nixos /mnt/persist/etc/nixos
+
+# 13. Reboot. If Secure Boot is enabled, enter UEFI Setup Mode first (clear SB keys).
+sudo reboot
 ```
 
-### B — New system (BTRFS layout)
+### B — New system (LVM layout, `server` profile)
 
-> **Mandatory:** step 5 creates `@root-blank`. The initrd rollback service snapshots `@root-blank → @` on every boot. Skipping this step causes a first-boot failure.
+Headless server with LVM and tmpfs root.
 
 ```bash
-# 1. Boot the NixOS minimal ISO and get a root shell.
+# 1. Boot the NixOS minimal ISO.
 
-# 2. Clone NERV.nixos.
-mkdir -p /mnt/etc/nixos
-git clone https://github.com/atirelli3/NERV.nixos.git /mnt/etc/nixos
-cd /mnt/etc/nixos
+# 2. Clone to the live-ISO ramdisk.
+git clone https://github.com/atirelli3/NERV.nixos.git /tmp/nixos
 
-# 3. Provision the disk.
-nix --experimental-features "nix-command flakes" run github:nix-community/disko/v1.13.0 -- \
-  --mode destroy,format,mount modules/system/disko.nix
+# 3. Fill every value — including nerv.disko.layout = "lvm" and LVM sizes.
+nano /tmp/nixos/hosts/configuration.nix
 
-# 4. Create the rollback baseline — MANDATORY.
-btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank
+# 4. Set the LUKS password.
+echo -n "your-luks-password" > /tmp/luks-password
 
-# 5. Generate and copy hardware configuration.
-nixos-generate-config --no-filesystems --root /mnt
-cp /mnt/etc/nixos/hardware-configuration.nix hosts/hardware-configuration.nix
+# 5. Provision the disk — THIS ERASES THE TARGET DISK.
+nix --experimental-features "nix-command flakes" \
+  run github:nix-community/disko/v1.13.0 -- \
+  --mode destroy,format,mount --flake /tmp/nixos#server
 
-# 6. Edit hosts/configuration.nix — fill every PLACEHOLDER value.
-nano hosts/configuration.nix
+# 6. Clone to the target filesystem.
+sudo mkdir -p /mnt/etc/nixos
+sudo git clone https://github.com/atirelli3/NERV.nixos.git /mnt/etc/nixos
+sudo cp /tmp/nixos/hosts/configuration.nix /mnt/etc/nixos/hosts/configuration.nix
 
-# 7. Install.
-nixos-install --flake /mnt/etc/nixos#host
+# 7. Generate hardware configuration.
+nixos-generate-config --no-filesystems --show-hardware-config \
+  | sudo tee /mnt/etc/nixos/hosts/hardware-configuration.nix
+
+# 8. Stage files and install.
+sudo git -C /mnt/etc/nixos add -A
+sudo nixos-install --flake /mnt/etc/nixos#server
+
+# 9. Copy config to /persist.
+sudo mkdir -p /mnt/persist/etc/nixos
+sudo cp -rT /mnt/etc/nixos /mnt/persist/etc/nixos
+
+# 10. Reboot and remove the ISO.
+sudo reboot
 ```
 
 ### C — Existing NixOS system
@@ -115,13 +159,12 @@ sudo cp -r /etc/nixos /etc/nixos.bak
 
 # 2. Clone NERV.nixos.
 sudo git clone https://github.com/atirelli3/NERV.nixos.git /etc/nixos
-cd /etc/nixos
 
 # 3. Copy your existing hardware configuration.
-sudo cp /etc/nixos.bak/hardware-configuration.nix hosts/hardware-configuration.nix
+sudo cp /etc/nixos.bak/hardware-configuration.nix /etc/nixos/hosts/hardware-configuration.nix
 
-# 4. Edit hosts/configuration.nix — fill every PLACEHOLDER value.
-sudo nano hosts/configuration.nix
+# 4. Edit hosts/configuration.nix — fill every value.
+sudo nano /etc/nixos/hosts/configuration.nix
 
 # 5. Switch to NERV.
 sudo nixos-rebuild switch --flake /etc/nixos#host
