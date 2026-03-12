@@ -13,8 +13,8 @@
 
 ### Prompt
 
-- [ ] **PRMT-01**: Starship prompt activates automatically when `nerv.zsh.enable = true` — no separate toggle
-- [ ] **PRMT-02**: Prompt renders username on line 1 (dim cyan) and `$` on line 2 (white; red on non-zero exit code) with no other modules
+- [x] **PRMT-01**: Starship prompt activates automatically when `nerv.zsh.enable = true` — no separate toggle
+- [x] **PRMT-02**: Prompt renders username on line 1 (dim cyan) and `$` on line 2 (white; red on non-zero exit code) with no other modules
 
 ## v4.0 Requirements
 
@@ -47,8 +47,8 @@
 | SWAP-01 | Phase 14 | Complete |
 | SWAP-02 | Phase 14 | Complete |
 | SWAP-03 | Phase 14 | Complete |
-| PRMT-01 | Phase 15 | Pending |
-| PRMT-02 | Phase 15 | Pending |
+| PRMT-01 | Phase 15 | Complete |
+| PRMT-02 | Phase 15 | Complete |
 
 **Coverage:**
 - v3.0 requirements: 5 total

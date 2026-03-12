@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
 status: "Roadmap approved — ready for /gsd:plan-phase 14"
-stopped_at: Phase 15 context gathered
-last_updated: "2026-03-12T21:04:45.644Z"
+stopped_at: "Phase 15-01 Task 1 complete; Task 2 checkpoint:human-verify pending"
+last_updated: "2026-03-12T21:19:29.401Z"
 last_activity: 2026-03-12 — v3.0 roadmap created
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 2
+  total_plans: 2
+  completed_plans: 2
   percent: 0
 ---
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0% (v3.0 — 0/2 phases)
 | Phase 13-audit-gap-closure P04 | 1 | 1 tasks | 1 files |
 | Phase 14-zram-swap-module P01 | 15 | 1 tasks | 1 files |
 | Phase 14-zram-swap-module P01 | 15 | 2 tasks | 1 files |
+| Phase 15-starship-prompt-integration P01 | 5 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Recent decisions affecting current work:
 - [Phase 14-zram-swap-module]: zramSwap block placed inside lib.mkIf isBtrfs double-guard; lib.mkForce on algorithm; priority=100; memoryMax omitted to avoid nixpkgs #435031
 - [Phase 14-zram-swap-module]: zramSwap block double-guarded inside lib.mkIf isBtrfs AND lib.mkIf cfg.btrfs.zram.enable — defense in depth if assertion bypassed
 - [Phase 14-zram-swap-module]: memoryMax omitted entirely to avoid nixpkgs #435031 silent size truncation bug
+- [Phase 15-starship-prompt-integration]: programs.starship.enable used exclusively (never interactiveShellInit eval) to avoid double-init clobbering history-substring-search ZLE hooks
+- [Phase 15-starship-prompt-integration]: interactiveOnly left at default true — promptInit runs after interactiveShellInit, preserving ZLE bindings for history-substring-search
+- [Phase 15-starship-prompt-integration]: format string pinned to $username\n$character only — prevents future nixpkgs default module additions from bleeding into the prompt
 
 ### Pending Todos
 
@@ -99,7 +103,7 @@ None at roadmap creation. Research flags above become implementation verificatio
 
 ## Session Continuity
 
-Last session: 2026-03-12T21:04:45.643Z
-Stopped at: Phase 15 context gathered
-Resume file: .planning/phases/15-starship-prompt-integration/15-CONTEXT.md
+Last session: 2026-03-12T21:19:29.400Z
+Stopped at: Phase 15-01 Task 1 complete; Task 2 checkpoint:human-verify pending
+Resume file: None
 Next action: /gsd:plan-phase 14
