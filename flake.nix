@@ -61,6 +61,14 @@
       # nerv.disko.lvm.persistSize        = "20G"; # /persist LV size
     };
 
+    # Headless server configuration.
+    # Defaults applied: LVM layout, full tmpfs impermanence.
+    server = {
+      nerv.disko.layout         = "lvm";   # "btrfs" for desktop/laptop | "lvm" for server
+      nerv.impermanence.enable  = true;
+      nerv.impermanence.mode    = "full";  # "btrfs" (BTRFS rollback) | "full" (/ as tmpfs, server)
+    };
+
   in {
     nixosModules = {
       # Aggregates system + services + home — the primary host flake entry point.
