@@ -60,7 +60,10 @@ Plans:
   2. Line 1 of the prompt shows the username in dim cyan; line 2 shows `$` in white on a zero exit code and red after a non-zero exit code
   3. Arrow-key history search (history-substring-search) works correctly after starship loads — ZLE bindings are not clobbered
   4. After a root subvolume rollback, the prompt reappears unchanged on the next login — `echo $STARSHIP_CONFIG` resolves to a path inside the Nix store
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 15-01-PLAN.md — Append programs.starship to zsh.nix and verify prompt, ZLE bindings, impermanence safety
 
 ## Progress
 
