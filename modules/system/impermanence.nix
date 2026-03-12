@@ -1,6 +1,7 @@
 # modules/system/impermanence.nix
 #
 # Selective persistence via environment.persistence bind-mounts. btrfs mode for desktop; full mode for server.
+# Profiles : host mode=btrfs | server mode=full
 
 { config, lib, pkgs, ... }:
 

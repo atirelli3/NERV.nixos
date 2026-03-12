@@ -1,6 +1,7 @@
 # modules/system/boot.nix
 #
 # Layout-agnostic initrd and bootloader (systemd-boot + EFI). Layout-specific initrd config lives in disko.nix.
+# Profiles : host | server
 
 { pkgs, ... }:
 

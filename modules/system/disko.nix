@@ -1,6 +1,7 @@
 # modules/system/disko.nix
 #
 # Declarative disk layout and layout-conditional initrd config. btrfs (desktop) or lvm (server). No default — must be set explicitly.
+# Profiles : host layout=btrfs | server layout=lvm
 
 { config, lib, pkgs, ... }:
 
