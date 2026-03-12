@@ -46,7 +46,10 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md`
   2. Setting `nerv.disko.btrfs.zram.memoryPercent = 25` causes the zram device to be sized at 25% of physical RAM
   3. Enabling zram on a system with `nerv.disko.layout = "lvm"` fails at `nix flake check` / `nixos-rebuild` evaluation with a clear error message — the build never reaches the boot stage
   4. Leaving `nerv.disko.btrfs.zram.enable = false` (the default) produces no zram device and no swap in the BTRFS profile — behavior is identical to v2.0
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 14-01-PLAN.md — Extend disko.nix with zram options, wired zramSwap config, and LVM assertion
 
 ### Phase 15: Starship Prompt Integration
 **Goal**: Any host with `nerv.zsh.enable = true` gets a minimal, impermanence-safe two-line shell prompt with no configuration required
@@ -76,7 +79,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md`
 | 11. Impermanence BTRFS Mode | 1/1 | ✅ Complete | 2026-03-10 |
 | 12. Profile Wiring and Documentation | 3/3 | ✅ Complete | 2026-03-10 |
 | 13. Audit Gap Closure | 4/4 | ✅ Complete | 2026-03-12 |
-| 14. zram Swap Module | 0/? | Not started | - |
+| 14. zram Swap Module | 0/1 | In progress | - |
 | 15. Starship Prompt Integration | 0/? | Not started | - |
 
 ---
