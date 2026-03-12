@@ -10,7 +10,7 @@
     ./packages.nix      # base system packages shipped on all flavors (git, fastfetch)
     ./boot.nix          # initrd + LUKS + bootloader (opaque)
     ./impermanence.nix  # selective per-directory tmpfs (enable = false by default)
-    ./disko.nix         # declarative disk layout — conditional LVM LVs based on impermanence mode
+    ./disko.nix         # declarative disk layout (btrfs/lvm) with layout-conditional initrd services
     ./secureboot.nix    # Lanzaboote + TPM2 — must be last (lib.mkForce false on systemd-boot)
   ];
 }
