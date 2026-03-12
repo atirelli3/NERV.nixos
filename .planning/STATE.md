@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Phase 13 context gathered
-last_updated: "2026-03-12T18:31:56.430Z"
+stopped_at: Completed 13-04-PLAN.md
+last_updated: "2026-03-12T18:46:45.012Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 13
   completed_phases: 12
-  total_plans: 31
-  completed_plans: 31
+  total_plans: 35
+  completed_plans: 34
   percent: 0
 ---
 
@@ -85,6 +85,8 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 12-profile-wiring-and-documentation P01 | 1 | 1 tasks | 1 files |
 | Phase 12-profile-wiring-and-documentation P02 | 3 | 2 tasks | 4 files |
 | Phase 12-profile-wiring-and-documentation P03 | 4 | 2 tasks | 1 files |
+| Phase 13-audit-gap-closure P03 | 5 | 1 tasks | 3 files |
+| Phase 13-audit-gap-closure P04 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -177,6 +179,8 @@ Recent decisions affecting current work:
 - [Phase 12-profile-wiring-and-documentation]: Section A (LVM/disko-configuration.nix path) left unchanged — plan explicitly forbids modification; BTRFS install walkthrough in new Section B
 - [Phase 12-profile-wiring-and-documentation]: boot.nix Module Reference prose updated to reference modules/system/disko.nix — removes stale hosts/disko-configuration.nix reference from outside Section A
 - [Phase 12-profile-wiring-and-documentation]: impermanence module note broadened to cover both btrfs (host) and full (server) modes
+- [Phase 13-audit-gap-closure]: # Profiles : line inserted after description line (line 3) and before blank separator (line 5) in each module header — preserves structure and keeps function args at line 6
+- [Phase 13-audit-gap-closure]: disko.nix comment updated to reflect Phase 9/10 reality: branching on nerv.disko.layout, not impermanence mode, plus layout-conditional initrd services
 
 ### v2.0 Decisions (pre-phase)
 
@@ -200,7 +204,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-12T18:31:56.428Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-audit-gap-closure/13-CONTEXT.md
+Last session: 2026-03-12T18:46:45.010Z
+Stopped at: Completed 13-04-PLAN.md
+Resume file: None
 Next action: /gsd:plan-phase 9
