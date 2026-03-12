@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
 status: "Roadmap approved — ready for /gsd:plan-phase 14"
-stopped_at: "Completed 14-01-PLAN.md Task 1; paused at Task 2 checkpoint:human-verify"
-last_updated: "2026-03-12T20:39:22.358Z"
+stopped_at: Completed 14-01-PLAN.md (all tasks done, human-verify approved)
+last_updated: "2026-03-12T20:45:03.301Z"
 last_activity: 2026-03-12 — v3.0 roadmap created
 progress:
   total_phases: 2
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0% (v3.0 — 0/2 phases)
 | Phase 13-audit-gap-closure P03 | 5 | 1 tasks | 3 files |
 | Phase 13-audit-gap-closure P04 | 1 | 1 tasks | 1 files |
 | Phase 14-zram-swap-module P01 | 15 | 1 tasks | 1 files |
+| Phase 14-zram-swap-module P01 | 15 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [v3.0 pre-phase]: programs.starship.interactiveOnly left at default true — false would move starship init before plugin chain, breaking history-substring-search ZLE bindings
 - [v3.0 pre-phase]: zram implemented first (new file, isolated risk) then starship (existing file, cleaner diff against known-working base)
 - [Phase 14-zram-swap-module]: zramSwap block placed inside lib.mkIf isBtrfs double-guard; lib.mkForce on algorithm; priority=100; memoryMax omitted to avoid nixpkgs #435031
+- [Phase 14-zram-swap-module]: zramSwap block double-guarded inside lib.mkIf isBtrfs AND lib.mkIf cfg.btrfs.zram.enable — defense in depth if assertion bypassed
+- [Phase 14-zram-swap-module]: memoryMax omitted entirely to avoid nixpkgs #435031 silent size truncation bug
 
 ### Pending Todos
 
@@ -96,7 +99,7 @@ None at roadmap creation. Research flags above become implementation verificatio
 
 ## Session Continuity
 
-Last session: 2026-03-12T20:39:22.357Z
-Stopped at: Completed 14-01-PLAN.md Task 1; paused at Task 2 checkpoint:human-verify
+Last session: 2026-03-12T20:45:03.300Z
+Stopped at: Completed 14-01-PLAN.md (all tasks done, human-verify approved)
 Resume file: None
 Next action: /gsd:plan-phase 14
