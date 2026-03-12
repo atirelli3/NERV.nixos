@@ -32,7 +32,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md`
 </details>
 
 **v3.0 phases (polish & UX):**
-- [ ] **Phase 14: zram Swap Module** — BTRFS-safe in-memory compressed swap via nerv.disko.btrfs.zram options
+- [x] **Phase 14: zram Swap Module** — BTRFS-safe in-memory compressed swap via nerv.disko.btrfs.zram options (completed 2026-03-12)
 - [ ] **Phase 15: Starship Prompt Integration** — Minimal two-line starship prompt auto-enabled with nerv.zsh
 
 ## Phase Details
@@ -79,7 +79,7 @@ Plans:
 | 11. Impermanence BTRFS Mode | 1/1 | ✅ Complete | 2026-03-10 |
 | 12. Profile Wiring and Documentation | 3/3 | ✅ Complete | 2026-03-10 |
 | 13. Audit Gap Closure | 4/4 | ✅ Complete | 2026-03-12 |
-| 14. zram Swap Module | 0/1 | In progress | - |
+| 14. zram Swap Module | 1/1 | Complete   | 2026-03-12 |
 | 15. Starship Prompt Integration | 0/? | Not started | - |
 
 ---

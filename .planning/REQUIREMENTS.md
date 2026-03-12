@@ -7,9 +7,9 @@
 
 ### Swap
 
-- [ ] **SWAP-01**: User can enable zram compressed swap via `nerv.disko.btrfs.zram.enable` (default: false, BTRFS layout only)
-- [ ] **SWAP-02**: User can configure zram device size as percent of RAM via `nerv.disko.btrfs.zram.memoryPercent` (default: 50)
-- [ ] **SWAP-03**: System raises a hard evaluation error when `nerv.disko.btrfs.zram.enable = true` on LVM layout
+- [x] **SWAP-01**: User can enable zram compressed swap via `nerv.disko.btrfs.zram.enable` (default: false, BTRFS layout only)
+- [x] **SWAP-02**: User can configure zram device size as percent of RAM via `nerv.disko.btrfs.zram.memoryPercent` (default: 50)
+- [x] **SWAP-03**: System raises a hard evaluation error when `nerv.disko.btrfs.zram.enable = true` on LVM layout
 
 ### Prompt
 
@@ -44,9 +44,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SWAP-01 | Phase 14 | Pending |
-| SWAP-02 | Phase 14 | Pending |
-| SWAP-03 | Phase 14 | Pending |
+| SWAP-01 | Phase 14 | Complete |
+| SWAP-02 | Phase 14 | Complete |
+| SWAP-03 | Phase 14 | Complete |
 | PRMT-01 | Phase 15 | Pending |
 | PRMT-02 | Phase 15 | Pending |
 
