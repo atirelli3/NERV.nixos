@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
 milestone: v3.0
-milestone_name: (next milestone — run /gsd:new-milestone)
-status: milestone_complete
-stopped_at: v2.0 shipped 2026-03-12
+milestone_name: Polish & UX
+status: defining_requirements
+stopped_at: ~
 last_updated: "2026-03-12T00:00:00.000Z"
-last_activity: 2026-03-12 — v2.0 milestone complete, archived
+last_activity: 2026-03-12 — Milestone v3.0 started
 progress:
   total_phases: 13
   completed_phases: 13
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-12 after v2.0)
 
 **Core value:** A user declares only their machine-specific parameters and gets a secure, well-documented NixOS system out of the box.
-**Current focus:** v2.0 shipped — planning v3.0 next
+**Current focus:** v3.0 Polish & UX — defining requirements
 
 ## Current Position
 
-Phase: —
+Phase: Not started (defining requirements)
 Plan: —
-Status: v2.0 milestone complete. Start next milestone with `/gsd:new-milestone`.
-Last activity: 2026-03-12 — v2.0 archived (13 phases, 35 plans, 33 requirements)
+Status: Defining requirements
+Last activity: 2026-03-12 — Milestone v3.0 started
 
 Progress: [██████████] 100% (v2.0 complete)
 

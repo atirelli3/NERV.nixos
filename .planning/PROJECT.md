@@ -63,14 +63,27 @@ A user should be able to declare only their machine-specific parameters and get 
 - ✓ Section-header comments on disko.nix, boot.nix, impermanence.nix with # Profiles cross-reference — v2.0
 - ✓ README install procedure documents post-disko @root-blank snapshot step — v2.0
 
-### Active (v3.0 candidates)
+## Current Milestone: v3.0 Polish & UX
+
+**Goal:** Add zram swap support for the BTRFS host profile and a minimal starship shell prompt.
+
+**Target features:**
+- zram swap (`nerv.swap.zram.enable` + size option) — BTRFS-safe in-memory compressed swap
+- Starship prompt integrated into `nerv.zsh` — minimal two-line, subtle color, username + `$`
+
+### Active (v3.0)
+
+- [ ] nerv.swap.zram.enable — zram compressed swap (default: false)
+- [ ] nerv.swap.zram.size — zram device size in MB (default: half RAM)
+- [ ] Starship prompt in nerv.zsh — minimal two-line, subtle cyan username + white `$`
+
+### Deferred (v4.0 candidates)
 
 - [ ] nerv.disko.tmpfsSize — configurable tmpfs size for server profile (currently hardcoded 2G)
 - [ ] @log subvolume on/off toggle (nerv.disko.logSubvolume.enable or similar)
 - [ ] nerv.nix.autoUpdate — auto-upgrade toggle (disabled by default)
 - [ ] nerv.kernel.package — override kernel package (currently hardcoded to zen)
 - [ ] nerv.nix.gcInterval — GC frequency option
-- [ ] Validate Nyquist compliance for phases 9, 11, 12, 13 (draft VALIDATION.md files)
 
 ### Out of Scope
 
@@ -119,4 +132,4 @@ A user should be able to declare only their machine-specific parameters and get 
 | preLVM omitted from luks.devices.cryptroot | Silently ignored by systemd stage 1 (boot.initrd.systemd.enable = true); documented in code and plan | ✓ Good — avoids misleading config |
 
 ---
-*Last updated: 2026-03-12 after v2.0 milestone completion*
+*Last updated: 2026-03-12 after v3.0 milestone start*
