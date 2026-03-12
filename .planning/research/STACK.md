@@ -1,8 +1,8 @@
-# Stack Research: nerv.nixos v2.0
+# Stack Research: nerv.nixos v3.0
 
-**Project:** nerv.nixos — Stateless Disk Layout (BTRFS + impermanence)
-**Mode:** Ecosystem — Stack dimension
-**Confidence:** HIGH
+**Project:** nerv.nixos — zram swap + starship prompt
+**Researched:** 2026-03-12
+**Confidence:** HIGH (options verified from nixpkgs release-25.11 source)
 
 ## Recommended Stack
 
@@ -10,86 +10,149 @@
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| disko | v1.13.0 (already pinned) | Declarative disk layout; adds BTRFS content type | Already in flake inputs; btrfs subvolume support added in v1.x |
-| nix-community/impermanence | HEAD (no release tags; pin to commit or nixpkgs-unstable follow) | `environment.persistence` declarative bind-mounts | De-facto community standard; much cleaner than custom tmpfiles.rules |
-| NixOS boot.initrd.systemd | Built-in (NixOS 25.11) | systemd-based initrd for BTRFS rollback service | Already enabled in boot.nix; `postDeviceCommands` incompatible with systemd initrd |
-| btrfs-progs | nixpkgs (in boot.initrd.supportedFilesystems) | BTRFS tools available in initrd for snapshot/delete | Must add "btrfs" to `boot.initrd.supportedFilesystems` |
+| `zramSwap` NixOS module | Built-in (NixOS 25.11) | In-memory compressed swap via kernel zram module | Already in nixpkgs; no extra flake inputs; BTRFS-safe (no swap file on filesystem) |
+| `programs.starship` NixOS module | Built-in (NixOS 25.11), starship 1.24.2 | Cross-shell prompt with declarative TOML config | Handles package, zsh promptInit injection, and STARSHIP_CONFIG env automatically |
 
 ### Supporting Libraries
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| impermanence.nixosModules.impermanence | (above) | Provides `environment.persistence` NixOS option | Add to nixosConfigurations modules list for all profiles using persistence |
-| boot.initrd.systemd.services.rollback | NixOS built-in | systemd service unit in initrd for BTRFS rollback | Desktop/host profile only — server uses tmpfs (no rollback needed) |
+None. Both features are provided by built-in NixOS modules. No new flake inputs required.
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| nix flake check | Verify module evaluation before deploy | Run after each phase; dev machine lacks nix but NERV.nixos target has it |
-| disko --dry-run | Preview disk layout without applying | Use on target machine before first install |
-| btrfs subvolume list /mnt | Verify subvolumes after disko run | Run during install validation |
+| `zramctl` | Verify zram device compression ratio at runtime | Run as root post-install to confirm zram is active |
+| `swapon --show` | Verify swap devices and priorities | Confirms zram swap is active and higher priority than disk |
+
+## NixOS Option Reference
+
+### zramSwap
+
+All options live at the top-level `zramSwap.*` attribute path (NOT under `services.*`).
+
+| Option | Type | Default | Purpose |
+|--------|------|---------|---------|
+| `zramSwap.enable` | bool | `false` | Activates zram kernel module and swap devices |
+| `zramSwap.swapDevices` | int | `1` | Number of zram swap devices (1 is recommended) |
+| `zramSwap.memoryPercent` | positive int | `50` | Max zram size as % of total RAM |
+| `zramSwap.memoryMax` | int or null | `null` | Absolute byte ceiling; if set, min(memoryPercent, memoryMax) wins |
+| `zramSwap.priority` | int | `5` | Swap priority; higher = filled before disk swap |
+| `zramSwap.algorithm` | enum or str | `"zstd"` | Compression: `"zstd"` (best default), `"lz4"` (fastest), `"lzo"` (legacy) |
+| `zramSwap.writebackDevice` | path or null | `null` | Block device for incompressible page writeback |
+
+**Implementation note:** `zramSwap` delegates to `services.zram-generator` under the hood. The nerv option `nerv.swap.zram.size` (in MB) as specified in PROJECT.md does not map directly to a single option. Use `zramSwap.memoryMax` (bytes) for an absolute cap, or `zramSwap.memoryPercent` for a RAM-relative default. The nerv wrapper should translate MB → bytes when `memoryMax` is used, or default to `memoryPercent = 50` when no explicit size is set.
+
+**Correct nerv mapping:**
+- `nerv.swap.zram.enable = true` → `zramSwap.enable = true`
+- `nerv.swap.zram.size` (int, MB) → `zramSwap.memoryMax = nerv.swap.zram.size * 1024 * 1024` (when size != 0), else fall back to `zramSwap.memoryPercent = 50` default
+
+### programs.starship
+
+All options live under `programs.starship.*`.
+
+| Option | Type | Default | Purpose |
+|--------|------|---------|---------|
+| `programs.starship.enable` | bool | `false` | Master switch; injects init into all supported shells |
+| `programs.starship.package` | package | `pkgs.starship` | Override starship binary (leave as default) |
+| `programs.starship.interactiveOnly` | bool | `true` | Init injected into `programs.zsh.promptInit`; false → `shellInit` |
+| `programs.starship.settings` | TOML attrs | `{}` | Declarative starship.toml; see starship.rs/config |
+| `programs.starship.presets` | list of str | `[]` | Preset files merged before settings (e.g. `"nerd-font-symbols"`) |
+
+**How zsh integration works (verified from source):**
+
+When `programs.starship.enable = true`, the module sets `programs.zsh.promptInit` to:
+
+```bash
+if [[ $TERM != "dumb" ]]; then
+  if [[ ! -f "$HOME/.config/starship.toml" ]]; then
+    export STARSHIP_CONFIG=<nix-store-path/starship.toml>
+  fi
+  eval "$(starship init zsh)"
+fi
+```
+
+This is appended to the system-generated `/etc/zshrc` by the `programs.zsh` NixOS module via its `promptInit` hook. It does **not** conflict with `interactiveShellInit` used in the existing `zsh.nix` — those are separate injection points in `/etc/zshrc`.
+
+**Load order in /etc/zshrc (NixOS-generated):**
+1. `shellInit` (before completion init)
+2. `interactiveShellInit` (after compinit — where our keybindings/fzf live)
+3. `promptInit` (after interactiveShellInit — where starship lands)
+
+This ordering is correct: starship init runs last, after all zsh plugins are loaded.
+
+**No `environment.systemPackages` entry needed.** The module references `cfg.package` (pkgs.starship) directly in the init script, which pulls it into the closure. Adding starship to `environment.systemPackages` would be redundant.
+
+**User config override:** If a user has `~/.config/starship.toml`, the module skips setting `STARSHIP_CONFIG` — their local config takes precedence. The `programs.starship.settings` TOML is only active when no `~/.config/starship.toml` exists.
 
 ## Installation
 
 ```nix
-# flake.nix — impermanence module already declared as input; just wire it:
-impermanence.nixosModules.impermanence  # add to all nixosConfigurations modules lists
+# No new flake inputs needed.
 
-# disko — already wired; no changes to inputs
+# modules/system/swap.nix (new file)
+zramSwap = {
+  enable = true;
+  memoryPercent = 50;    # or memoryMax = N * 1024 * 1024 for explicit MB cap
+  algorithm = "zstd";   # default; leave unless benchmarking
+  priority = 5;         # default; higher than disk swap (typically -1 or 0)
+};
 
-# boot.initrd — add btrfs to supported filesystems:
-boot.initrd.supportedFilesystems = [ "btrfs" ];
+# modules/services/zsh.nix (add to existing config block)
+programs.starship = {
+  enable = true;
+  settings = {
+    # minimal config; see FEATURES.md for exact prompt format
+  };
+};
 ```
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| boot.initrd.systemd.services for rollback | boot.initrd.postDeviceCommands | ONLY when systemd initrd is NOT used — incompatible with boot.nix |
-| disko BTRFS content type | Manual fileSystems entries | Never — disko provides declarative disk partitioning; manual is fragile |
-| environment.persistence (upstream module) | Custom bind-mounts via tmpfiles.rules (current) | Custom approach is fine but requires manual maintenance; upstream module has better API |
-| LUKS → btrfs content chain | LUKS → lvm_pv → btrfs LV | lvm_pv approach adds unnecessary complexity for BTRFS; direct is simpler |
+| `zramSwap` NixOS module | Manual `services.zram-generator.settings` | Never for nerv — the higher-level module provides cleaner API and nerv-compatible options |
+| `programs.starship` NixOS module | `environment.systemPackages = [pkgs.starship]` + manual eval in interactiveShellInit | Only if needing per-user config isolation not achievable via settings; the module approach is cleaner |
+| `programs.starship.settings` (declarative TOML) | `home.file.".config/starship.toml"` (Home Manager) | Use Home Manager approach only if users need per-user prompt customization; nerv ships a system-wide default |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| boot.initrd.postDeviceCommands | Incompatible with systemd initrd (already enabled in boot.nix) | boot.initrd.systemd.services.rollback |
-| impermanence input with nixpkgs.follows | Upstream impermanence has no nixpkgs input — setting follows causes eval error | Remove nixpkgs.follows from impermanence input (Phase 7 learned this) |
-| @home on tmpfs | Data loss on every reboot | @home as persistent BTRFS subvolume |
-| mount / as tmpfs on desktop | /nix store too large for RAM | tmpfs root only for server; desktop uses BTRFS @  |
+| `swapDevices` (the fileSystems swap option) | Creates a swap file on BTRFS — unsupported without `nodatacow` and btrfs-specific workarounds | `zramSwap.enable = true` — pure in-memory, no filesystem involvement |
+| `zramSwap.swapDevices > 1` | Multiple zram devices add complexity with no benefit for desktop use | Leave at default of 1 |
+| `zramSwap.writebackDevice` | Requires a dedicated block partition; adds disk wear | Only relevant for servers with NVMe writeback tier; omit for desktop |
+| Adding `pkgs.starship` to `environment.systemPackages` | Redundant when `programs.starship.enable = true` — the module already pulls it into the closure | Use only `programs.starship.enable = true` |
+| `programs.starship.interactiveOnly = false` | Injects starship into `shellInit` (non-interactive shells) which wastes startup time | Leave at default `true` — prompt only needed in interactive sessions |
+| Manually adding `eval "$(starship init zsh)"` to `interactiveShellInit` | Duplicates what `programs.starship` already injects via `promptInit`; runs starship init twice | Set `programs.starship.enable = true` and let the module handle it |
 
 ## Stack Patterns by Variant
 
-**If desktop/host profile (nerv.disko.layout = "btrfs"):**
-- disko: disk → gpt → {ESP vfat, luks → btrfs → subvolumes {@ @root-blank @home @nix @persist}}
-- boot.initrd: add btrfs to supportedFilesystems; add rollback systemd service
-- environment.persistence."/persist": declare dirs/files
-- neededForBoot on @persist and @nix subvols
+**For nerv.swap.zram.enable (new module at modules/system/swap.nix):**
+- Use `zramSwap.enable = true` + `zramSwap.memoryPercent = 50` as the default path
+- When `nerv.swap.zram.size` is set (non-zero), convert to bytes and use `zramSwap.memoryMax`
+- Keep `zramSwap.algorithm = "zstd"` — requires kernel >= 4.19 (zen kernel in nerv exceeds this)
 
-**If server/vm profile (nerv.disko.layout = "lvm"):**
-- disko: disk → gpt → {ESP vfat, luks → lvm_pv → lvm_vg → {swap, store=/nix, persist=/persist}}
-- fileSystems."/": tmpfs size=2G (from impermanence.nix full mode)
-- environment.persistence."/persist": declare dirs/files
-- neededForBoot on /persist LV
+**For nerv.zsh starship integration (modify modules/services/zsh.nix):**
+- Add `programs.starship.enable = lib.mkIf cfg.enable true` — starship follows zsh enable
+- Add `programs.starship.settings = { ... }` with the minimal prompt config
+- Do NOT change `interactiveShellInit` — starship goes into `promptInit` automatically
 
 ## Version Compatibility
 
-| Package | Compatible With | Notes |
-|---------|-----------------|-------|
-| disko v1.13.0 | NixOS 25.11 | Already pinned in flake.nix |
-| impermanence (HEAD/unstable) | NixOS 25.11 | No nixpkgs.follows (no nixpkgs input in upstream) |
-| btrfs-progs | NixOS 25.11 kernel | Included via boot.initrd.supportedFilesystems = ["btrfs"] |
+| Package | NixOS Version | Notes |
+|---------|---------------|-------|
+| `zramSwap` module | NixOS 25.11 (verified) | `services.zram-generator` backend; `numDevices` option was removed (use `swapDevices`) |
+| `starship` 1.24.2 | NixOS 25.11 / nixpkgs (verified 2026-02-23) | `programs.starship` module confirmed present in release-25.11 branch |
+| `zstd` compression | Linux kernel >= 4.19 | zen kernel in nerv is well above this threshold |
 
 ## Sources
 
-- flake.nix (existing inputs: disko v1.13.0, impermanence already declared)
-- modules/system/boot.nix (boot.initrd.systemd.enable = true confirmed)
-- disk-layout-refactor.md (design specification)
-- github.com/nix-community/impermanence (upstream module API)
-- NixOS wiki: Impermanence (initrd systemd service pattern)
+- `https://raw.githubusercontent.com/NixOS/nixpkgs/release-25.11/nixos/modules/config/zram.nix` — verified option names, types, defaults, and `services.zram-generator` delegation
+- `https://raw.githubusercontent.com/NixOS/nixpkgs/release-25.11/nixos/modules/programs/starship.nix` — verified option names, `initOption` logic, exact zsh `promptInit` injection code
+- `https://mynixos.com/nixpkgs/package/starship` — starship 1.24.2 version confirmed
+- `https://www.nixhub.io/packages/starship` — 1.24.2 last updated 2026-02-23
+- modules/services/zsh.nix (existing) — confirmed `interactiveShellInit` usage; no conflict with `promptInit`
 
 ---
-*Stack research for: nerv.nixos v2.0 stateless disk layout*
-*Researched: 2026-03-09*
+*Stack research for: nerv.nixos v3.0 — zram swap + starship prompt*
+*Researched: 2026-03-12*
