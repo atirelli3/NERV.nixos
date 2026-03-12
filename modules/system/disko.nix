@@ -66,9 +66,36 @@ in {
         example     = "20G";
       };
     };
+
+    btrfs.zram = {
+      enable = lib.mkOption {
+        type        = lib.types.bool;
+        default     = false;
+        description = "Enable zram compressed swap (BTRFS layout only). Creates /dev/zram0 sized at memoryPercent of physical RAM.";
+      };
+      memoryPercent = lib.mkOption {
+        type        = lib.types.ints.between 1 100;
+        default     = 50;
+        description = "Maximum zram swap size as a percentage of total RAM. The default (50 %) gives a 2:1 headroom for zstd-compressed pages.";
+        example     = 25;
+      };
+    };
   };
 
   config = lib.mkMerge [
+
+    # ── zram layout guard (fires on any layout when zram.enable = true) ─────
+    (lib.mkIf cfg.btrfs.zram.enable {
+      assertions = [{
+        assertion = isBtrfs;
+        message   = ''
+          nerv: nerv.disko.btrfs.zram.enable requires
+            nerv.disko.layout = "btrfs".
+            The LVM layout provides disk-based swap via the swap LV.
+            Disable zram or switch to the btrfs layout.
+        '';
+      }];
+    })
 
     # ── BTRFS branch ─────────────────────────────────────────────────────
     (lib.mkIf isBtrfs {
@@ -131,6 +158,18 @@ in {
             /btrfs_tmp/@root-blank /btrfs_tmp/@
           umount /btrfs_tmp
         '';
+      };
+
+      # ── zram compressed swap (BTRFS only) ────────────────────────────────
+      # Activated only when nerv.disko.btrfs.zram.enable = true.
+      # Note: kernel.nix sets init_on_free=1. Heavy zram usage under zstd adds
+      # CPU overhead (decompression on page-out) — acceptable on desktop workloads.
+      zramSwap = lib.mkIf cfg.btrfs.zram.enable {
+        enable        = true;
+        memoryPercent = cfg.btrfs.zram.memoryPercent;
+        priority      = 100;  # prefer zram over any other swap source
+        # algorithm hardcoded to zstd in v3.0; use lib.mkForce to override.
+        algorithm     = lib.mkForce "zstd";
       };
     })
 
