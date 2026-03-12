@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v2.0 Stateless NixOS Library** — Phases 1-13 (shipped 2026-03-12)
-- 📋 **v3.0** — Planned (run `/gsd:new-milestone` to start)
+- 🔄 **v3.0 Polish & UX** — Phases 14-15 (in progress)
 
 ## Phases
 
@@ -31,10 +31,38 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md`
 
 </details>
 
+**v3.0 phases (polish & UX):**
+- [ ] **Phase 14: zram Swap Module** — BTRFS-safe in-memory compressed swap via nerv.disko.btrfs.zram options
+- [ ] **Phase 15: Starship Prompt Integration** — Minimal two-line starship prompt auto-enabled with nerv.zsh
+
+## Phase Details
+
+### Phase 14: zram Swap Module
+**Goal**: Operators using the BTRFS host profile can enable in-memory compressed swap with a single option
+**Depends on**: Nothing (new file, zero dependencies on in-flight work)
+**Requirements**: SWAP-01, SWAP-02, SWAP-03
+**Success Criteria** (what must be TRUE):
+  1. Setting `nerv.disko.btrfs.zram.enable = true` on a BTRFS host causes `swapon --show` to list `/dev/zram0` after boot
+  2. Setting `nerv.disko.btrfs.zram.memoryPercent = 25` causes the zram device to be sized at 25% of physical RAM
+  3. Enabling zram on a system with `nerv.disko.layout = "lvm"` fails at `nix flake check` / `nixos-rebuild` evaluation with a clear error message — the build never reaches the boot stage
+  4. Leaving `nerv.disko.btrfs.zram.enable = false` (the default) produces no zram device and no swap in the BTRFS profile — behavior is identical to v2.0
+**Plans**: TBD
+
+### Phase 15: Starship Prompt Integration
+**Goal**: Any host with `nerv.zsh.enable = true` gets a minimal, impermanence-safe two-line shell prompt with no configuration required
+**Depends on**: Phase 14 (clean base; starship modifies an existing file, zram creates a new one — ordering keeps diffs isolated)
+**Requirements**: PRMT-01, PRMT-02
+**Success Criteria** (what must be TRUE):
+  1. On a host where `nerv.zsh.enable = true`, opening a new shell displays the two-line starship prompt without any additional option — no `nerv.zsh.starship.enable` flag needed
+  2. Line 1 of the prompt shows the username in dim cyan; line 2 shows `$` in white on a zero exit code and red after a non-zero exit code
+  3. Arrow-key history search (history-substring-search) works correctly after starship loads — ZLE bindings are not clobbered
+  4. After a root subvolume rollback, the prompt reappears unchanged on the next login — `echo $STARSHIP_CONFIG` resolves to a path inside the Nix store
+**Plans**: TBD
+
 ## Progress
 
-| Phase | Plans | Status | Completed |
-|-------|-------|--------|-----------|
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
 | 1. Flake Foundation | 2/2 | ✅ Complete | 2026-03-06 |
 | 2. Services Reorganization | 3/3 | ✅ Complete | 2026-03-06 |
 | 3. System Modules (non-boot) | 3/3 | ✅ Complete | 2026-03-07 |
@@ -48,6 +76,8 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md`
 | 11. Impermanence BTRFS Mode | 1/1 | ✅ Complete | 2026-03-10 |
 | 12. Profile Wiring and Documentation | 3/3 | ✅ Complete | 2026-03-10 |
 | 13. Audit Gap Closure | 4/4 | ✅ Complete | 2026-03-12 |
+| 14. zram Swap Module | 0/? | Not started | - |
+| 15. Starship Prompt Integration | 0/? | Not started | - |
 
 ---
-*v2.0 shipped 2026-03-12 · Next: `/gsd:new-milestone`*
+*v2.0 shipped 2026-03-12 · v3.0 roadmap created 2026-03-12*
