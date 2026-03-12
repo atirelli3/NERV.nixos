@@ -44,13 +44,13 @@
 ### Disk Layout (DISKO)
 
 - [x] **DISKO-01**: User can set `nerv.disko.layout = "btrfs"` to get a GPT/LUKS/BTRFS disk with subvolumes @, @root-blank, @home, @nix, @persist, @log declared in `disko.nix`
-- [x] **DISKO-02**: User can set `nerv.disko.layout = "lvm"` to get the existing GPT/LUKS/LVM layout (swap + root LV or store + persist LVs depending on impermanence mode)
+- [ ] **DISKO-02**: User can set `nerv.disko.layout = "lvm"` to get the existing GPT/LUKS/LVM layout (swap + root LV or store + persist LVs depending on impermanence mode)
 - [x] **DISKO-03**: BTRFS subvolumes use mount options `compress=zstd:3`, `noatime`, `space_cache=v2`; no swap LV is emitted in BTRFS layout (BTRFS CoW incompatibility with swap files)
 
 ### Boot / Rollback (BOOT)
 
 - [x] **BOOT-01**: When `nerv.disko.layout = "btrfs"`, initrd includes btrfs-progs via `boot.initrd.supportedFilesystems = ["btrfs"]` and `boot.initrd.systemd.storePaths = [pkgs.btrfs-progs]`
-- [x] **BOOT-02**: When `nerv.disko.layout = "btrfs"`, a `boot.initrd.systemd.services.rollback` unit runs after `dev-mapper-cryptroot.device`, before `sysroot.mount`, deletes `@`, and snapshots `@root-blank → @` — resetting root on every reboot
+- [ ] **BOOT-02**: When `nerv.disko.layout = "btrfs"`, a `boot.initrd.systemd.services.rollback` unit runs after `dev-mapper-cryptroot.device`, before `sysroot.mount`, deletes `@`, and snapshots `@root-blank → @` — resetting root on every reboot
 - [x] **BOOT-03**: LVM initrd services (`boot.initrd.services.lvm.enable`, `preLVM = true`, `dm-snapshot` kernel module) are only active when `nerv.disko.layout = "lvm"` — disabled for BTRFS to prevent initrd hang on a device with no LVM PV
 
 ### Persistence (PERSIST)
@@ -61,9 +61,9 @@
 ### Profiles & Documentation (PROF)
 
 - [x] **PROF-01**: `hostProfile` in `flake.nix` declares `nerv.disko.layout = "btrfs"` and `nerv.impermanence.mode = "btrfs"`
-- [x] **PROF-02**: `serverProfile` and `vmProfile` declare `nerv.disko.layout = "lvm"` explicitly
-- [x] **PROF-03**: Section-header comments on `disko.nix`, `boot.nix`, and `impermanence.nix` are updated to reflect new options and behavior
-- [x] **PROF-04**: Install procedure documents the required post-disko manual step: `btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank` to create the clean rollback baseline
+- [ ] **PROF-02**: `serverProfile` and `vmProfile` declare `nerv.disko.layout = "lvm"` explicitly
+- [ ] **PROF-03**: Section-header comments on `disko.nix`, `boot.nix`, and `impermanence.nix` are updated to reflect new options and behavior
+- [ ] **PROF-04**: Install procedure documents the required post-disko manual step: `btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank` to create the clean rollback baseline
 
 ## Future Requirements
 
@@ -116,22 +116,23 @@
 | DOCS-03 | Phase 6 | Complete |
 | DOCS-04 | Phase 6 | Complete |
 | DISKO-01 | Phase 9 | Complete |
-| DISKO-02 | Phase 9 | Complete |
+| DISKO-02 | Phase 13 | Pending |
 | DISKO-03 | Phase 9 | Complete |
 | BOOT-01 | Phase 10 | Complete |
-| BOOT-02 | Phase 10 | Complete |
+| BOOT-02 | Phase 13 | Pending |
 | BOOT-03 | Phase 10 | Complete |
 | PERSIST-01 | Phase 11 | Complete |
 | PERSIST-02 | Phase 11 | Complete |
 | PROF-01 | Phase 12 | Complete |
-| PROF-02 | Phase 12 | Complete |
-| PROF-03 | Phase 12 | Complete |
-| PROF-04 | Phase 12 | Complete |
+| PROF-02 | Phase 13 | Pending |
+| PROF-03 | Phase 13 | Pending |
+| PROF-04 | Phase 13 | Pending |
 
 **Coverage:**
 - v2 requirements: 12 total
 - Mapped to phases: 12
 - Unmapped: 0 ✓
+- Pending (gap closure): DISKO-02, BOOT-02, PROF-02, PROF-03, PROF-04 → Phase 13
 
 ---
 *Requirements defined: 2026-03-06*

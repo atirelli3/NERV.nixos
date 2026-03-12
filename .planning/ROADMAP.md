@@ -233,6 +233,27 @@ Plans:
 - [ ] 12-02-PLAN.md — Add Profiles cross-reference lines to disko.nix, boot.nix, impermanence.nix headers; fix hosts/configuration.nix Role line
 - [ ] 12-03-PLAN.md — Update README.md: add BTRFS install section, update Profiles table, update Repository Layout, fix impermanence description
 
+### Phase 13: Audit Gap Closure — Server Profile, README, and Header Fixes
+**Goal**: Wire the missing `nixosConfigurations.server` flake output, add the mandatory `@root-blank` snapshot step to the README BTRFS walkthrough, and apply Profiles cross-reference comments to the three affected module headers
+**Depends on**: Phase 12
+**Requirements**: DISKO-02, PROF-02, BOOT-02, PROF-04, PROF-03
+**Gap Closure:** Closes all gaps from v2.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. `flake.nix` contains a `server` let-binding with `nerv.disko.layout = "lvm"` and `nerv.impermanence.mode = "full"`; `nixosConfigurations.server` is present and mirrors the `host` structure
+  2. `nix eval .#nixosConfigurations.server.config.nerv.disko.layout` returns `"lvm"` without errors
+  3. README BTRFS install section contains `btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank` as a mandatory step between disko provisioning and `nixos-install`
+  4. `disko.nix`, `boot.nix`, and `impermanence.nix` headers each contain a `# Profiles :` cross-reference line naming which profile uses which layout/mode
+  5. `modules/system/default.nix` line 13 comment reads `# declarative disk layout (btrfs/lvm) with layout-conditional initrd services`
+**Plans**: 4 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Wire server let-binding and nixosConfigurations.server in flake.nix
+- [ ] 13-02-PLAN.md — Insert @root-blank snapshot step into README BTRFS walkthrough
+- [ ] 13-03-PLAN.md — Add Profiles cross-reference comments to disko.nix, boot.nix, impermanence.nix headers
+- [ ] 13-04-PLAN.md — Fix stale comment in modules/system/default.nix line 13
+
+---
+
 ## Progress
 
 **Execution Order:**
@@ -254,3 +275,4 @@ Note: Phase 10 and Phase 11 both depend on Phase 9 and may be executed in either
 | 10. initrd BTRFS Rollback Service | 2/2 | Complete    | 2026-03-10 |
 | 11. Impermanence BTRFS Mode | 1/1 | Complete    | 2026-03-10 |
 | 12. Profile Wiring and Documentation | 3/3 | Complete    | 2026-03-10 |
+| 13. Audit Gap Closure | 0/4 | Pending | — |
