@@ -1,173 +1,166 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-03-10
+**Analysis Date:** 2026-03-12
 
 ## Test Framework
 
-**Runner:**
-- No automated test runner. There is no Jest, Vitest, pytest, or similar framework.
-- The project uses the Nix CLI and shell commands as its validation toolchain.
-- Automated test execution is integrated into a per-phase validation contract system (`.planning/phases/<phase>/VALIDATION.md`)
+**Status:** Not detected
 
-**Primary validation tools:**
-- `nix-instantiate --parse <file.nix>` — Nix syntax check (fast, ~1s)
-- `nix flake check --no-build` — full module evaluation without building (~30s)
-- `nix flake check` — full evaluation + build (~60–120s)
-- `nix eval .#nixosConfigurations.<name>.config.<option>` — option value spot-check
-- `grep` / `shell assertions` — structural content checks on .nix files
+**Language-specific observation:**
+- nerv.nixos is a NixOS flake library written in the Nix language
+- No traditional test framework (Jest, Vitest, Mocha, pytest, etc.) is used
+- Nix does not have a standard unit testing framework in the ecosystem
+- Testing is performed through NixOS system builds and manual validation
 
-**Run Commands:**
-```bash
-nix-instantiate --parse modules/system/disko.nix   # Syntax check single file
-nix flake check --no-build                         # Full eval, no build (fast pass)
-nix flake check                                    # Full eval + build (complete pass)
-nix eval .#nixosConfigurations.host.config.nerv.disko.layout   # Option spot-check
-```
+**Verification Approach:**
+- No `*.test.nix`, `*.spec.nix`, or test directory detected
+- No test configuration files found: `jest.config.*`, `vitest.config.*`, `pytest.ini`, etc.
+- No test package dependencies in `flake.nix` (only nixpkgs, lanzaboote, home-manager, disko, impermanence)
 
-**Platform note:** The development machine is macOS (Darwin). The `nix` binary is unavailable in this environment. All `nix-*` commands must run on a NixOS target machine. Shell-based checks (`grep`, `ls`, `wc -l`) run locally on macOS.
+## Test File Organization
 
-## Validation Contract System
+**Location:** Not applicable — no dedicated test files exist
 
-Each phase has a `VALIDATION.md` file at `.planning/phases/<phase>-<slug>/VALIDATION.md`.
+**Testing Strategy:**
+- Testing is implicit through NixOS system builds
+- Each module is evaluated and built as part of the full system configuration
+- Manual validation occurs through real system installation and runtime verification
 
-**Frontmatter fields:**
-```yaml
----
-phase: 9
-slug: btrfs-disko-layout
-status: complete
-nyquist_compliant: false
-wave_0_complete: true
-created: 2026-03-09
----
-```
+## Configuration Validation
 
-**Per-Task Verification Map** — every task maps to a testable assertion:
+**Assertions (evaluating phase validation):**
+- NixOS assertions used to validate configuration correctness at evaluation time
+- Caught before system build begins
+- No runtime tests to verify behavior after build completes
 
-| Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 9-01-02 | 01 | 1 | DISKO-01 | smoke | `grep -c '"/@"' modules/system/disko.nix` (expect ≥1) | ✅ | ✅ green |
+**Assertion Locations:**
+- `modules/services/openssh.nix:48-51` — validates `tarpitPort != port`
+- `modules/system/impermanence.nix:74-85` — validates `/var/lib/sbctl` is not in tmpfs paths when secure boot enabled
 
-Status values: `⬜ pending`, `✅ green`, `❌ red`, `⚠️ flaky`, `→ manual-only`
+## Build-Time Verification
 
-**Nyquist compliance:** A phase is `nyquist_compliant: true` when no 3 consecutive tasks lack an automated verification command. This ensures sampling density — automated checks bracket every logical unit of work.
+**System Build:**
+- Full system evaluation and build serves as the primary test
+- `nixos-rebuild switch --flake /etc/nixos#host` builds and switches to new configuration
+- Build failures indicate configuration errors
 
-## Test Types
+**Hardware Configuration:**
+- `nixos-generate-config --no-filesystems --show-hardware-config` auto-generates hardware-specific settings
+- Generated to `hosts/hardware-configuration.nix` per-host
+- Validates that generated config aligns with actual system hardware
 
-**smoke:**
-- Fastest feedback signal — file existence or content presence
-- Example: `ls modules/system/default.nix modules/services/default.nix`
-- Example: `grep -c '"/@"' modules/system/disko.nix` (expect ≥1)
-- Used after every task commit
+## Installation Verification
 
-**grep / shell:**
-- Structural content assertions via `grep`, `wc -l`, `ls`
-- Example: `grep -c 'space_cache=v2' modules/system/disko.nix` (expect 5)
-- Example: `grep -q 'nerv.disko.layout = "btrfs"' flake.nix`
-- Runs instantly on macOS dev machine; no nix required
+**Multi-phase Installation (documented in MEMORY.md):**
 
-**integration:**
-- Full flake evaluation or rebuild
-- Example: `nix flake check --no-build`, `nix flake check`
-- Requires NixOS target machine
-- Run after each plan wave, not each task
+1. **Disko layout generation:** `nix run github:nix-community/disko/v1.13.0 -- --mode destroy,format,mount --flake /tmp/nixos#host` validates disk layout declarations and applies them
+2. **NixOS installation:** `nixos-install --flake /mnt/etc/nixos#host` evaluates all modules and builds the system
+3. **Secure Boot keys:** `sbctl create-keys` and key verification validate Secure Boot integration
+4. **Post-boot validation:** Manual system startup and function verification
 
-**manual-only:**
-- Behaviors that require a real boot, a VM, or external state
-- Documented in the `Manual-Only Verifications` table with explicit test instructions
-- Examples: "BTRFS subvolumes actually created at install time", "full impermanence activates correctly on server"
+**Known Fragile Points:**
+- Secure Boot key placement: must exist in three locations (`/var/lib/sbctl`, `/mnt/var/lib/sbctl`, `/mnt/persist/var/lib/sbctl`) — see MEMORY.md
+- LUKS password handling via `/tmp/luks-password` file requires careful environment setup
+- Disko auto-generation of `boot.initrd.luks.devices.cryptroot.device` must not be overridden explicitly
 
-## Validation File Structure
+## Manual Validation Patterns
 
-```
-.planning/phases/<N>-<slug>/
-├── <N>-VALIDATION.md        # Validation contract (test types, commands, per-task map)
-├── <N>-VERIFICATION.md      # Execution results (truths confirmed, pass/fail counts)
-├── <N>-01-PLAN.md           # Task plan for plan wave 01
-├── <N>-01-SUMMARY.md        # Execution summary for plan wave 01
-└── ...
-```
+**Installation Flow Testing:**
+1. Clone to `/tmp/nixos` (NOT `/mnt` as disko wipes `/mnt`)
+2. Edit `hosts/configuration.nix` with target hostname, users, hardware, and disk device
+3. Set disk layout: `nerv.disko.layout = "btrfs"` (desktop) or `"lvm"` (server)
+4. Run disko to format and mount: `disko --mode destroy,format,mount`
+5. Generate hardware config: `nixos-generate-config --no-filesystems`
+6. Run nixos-install with flake: `nixos-install --flake /mnt/etc/nixos#host`
+7. Post-install: set user password, copy config to `/mnt/persist/etc/nixos` if using impermanence
+8. Reboot and verify system comes up cleanly
 
-**VERIFICATION.md** records post-execution results with explicit truth statements:
-- Lists each requirement and whether it was confirmed
-- Reports overall pass/fail ratio (e.g., "7/7 truths")
-- Documents any deferred checks and why
+**Service Validation:**
+- OpenSSH: SSH connection test to port 2222 (or configured port), verify tarpit on port 22
+- PipeWire audio: `pactl list sinks` or `pwvucontrol` for audio routing
+- Zsh: verify shell aliases work (`nrs`, `gs`, `gaa` git commands), fzf integration (`Ctrl+R` history search)
+- Impermanence: verify `/persist` mounts correctly, verify `/` is tmpfs in full mode, verify BTRFS rollback works
 
-## Wave-Based Execution Model
+## Configuration Error Patterns
 
-Phases are divided into plan waves (01, 02, 03...). Each wave:
-1. Has a PLAN.md defining tasks
-2. Has a SUMMARY.md recording what was done
-3. Corresponds to rows in the Per-Task Verification Map
+**Missing Required Options:**
+- `nerv.hostname` — assertion fails with "must not be empty string"
+- `nerv.disko.layout` — must be explicitly set to "btrfs" or "lvm"; no default
+- `disko.devices.disk.main.device` — must point to actual disk (e.g., `/dev/nvme0n1`)
+- `nerv.hardware.cpu` and `nerv.hardware.gpu` — required for proper microcode and driver selection
 
-**Wave 0** is special: covers test infrastructure setup (creating config files, installing frameworks). For this codebase Wave 0 always concludes "No new test infrastructure required — validation uses nix CLI which is the project's native toolchain."
+**Type Mismatches:**
+- Port numbers must be integers; fail2ban settings expect strings (`toString cfg.port`)
+- Size strings must follow format: "16G", "60G" (see `modules/system/disko.nix:49-66`)
+- Boolean flags must be true/false, not strings
 
-## Sampling Rate Convention
+**Logic Errors:**
+- Setting `nerv.impermanence.extraDirs` with `/var/lib/sbctl` when secure boot enabled triggers assertion error
+- Setting `nerv.openssh.tarpitPort` equal to `nerv.openssh.port` triggers assertion error
+- Conflicting kernel parameters can cause boot failures (none detected in current code)
 
-From the validation contracts:
+## Known Test Scenarios
 
-```
-- After every task commit:   Run the automated command for that task
-- After every plan wave:     Run nix flake check (or equivalent full-suite command)
-- Before /gsd:verify-work:  Full suite must be green
-- Max feedback latency:      10–120 seconds depending on command type
-```
+**BTRFS Desktop Installation:**
+1. Set `nerv.disko.layout = "btrfs"`
+2. Set `nerv.impermanence.mode = "btrfs"` (default)
+3. Verify rollback service runs at boot: `/var/log/boot.log` or `journalctl -b`
+4. Create a test file in `/home`, reboot, verify file is gone
 
-## Assertions as Inline Tests
+**LVM Server Installation:**
+1. Set `nerv.disko.layout = "lvm"`
+2. Set `nerv.disko.lvm.swapSize = "16G"` (2x RAM), `storeSize = "60G"`, `persistSize = "20G"`
+3. Set `nerv.impermanence.mode = "full"` (/ as tmpfs)
+4. Verify `/` is tmpfs: `mount | grep tmpfs`
+5. Verify `/nix` and `/persist` are ext4: `mount | grep ext4`
 
-The Nix module system's `assertions` mechanism functions as runtime validation at `nixos-rebuild` time:
+**Secure Boot Validation:**
+1. Set `nerv.secureboot.enable = true` in flake
+2. Ensure sbctl keys created: `sbctl list-keys`
+3. Boot into UEFI Setup Mode before first boot with secure boot enabled
+4. Verify signed boot: `bootctl status`
 
-```nix
-assertions = [{
-  assertion = cfg.tarpitPort != cfg.port;
-  message   = "nerv.openssh.tarpitPort (${toString cfg.tarpitPort}) must differ from nerv.openssh.port (${toString cfg.port}).";
-}];
-```
+**SSH Hardening Validation:**
+1. Set `nerv.openssh.enable = true`
+2. Attempt SSH connections within 10 minutes: should be rate-limited after 3 failures
+3. Verify tarpit on port 22: `timeout 2 curl -v telnet://localhost:22` (should hang)
+4. Verify SSH daemon on configured port: `ssh -p 2222 user@localhost` succeeds
 
-These fire on every `nixos-rebuild switch/boot/test` and serve as integration tests for module invariants. All assertions are in production modules — no separate test module files exist.
+## Coverage Notes
 
-**Assertion locations:**
-- `modules/services/openssh.nix`: port collision guard
-- `modules/system/identity.nix`: non-empty hostname guard
-- `modules/system/impermanence.nix`: sbctl path + tmpfs wipe guard (conditional on `nerv.secureboot.enable`)
+**What IS validated:**
+- Configuration syntax (NixOS evaluation)
+- Assertion conditions (pre-build validation)
+- Module composition and option inheritance
+- System build completion
+- Hardware compatibility (via auto-generated hardware-configuration.nix)
+- Installation process flow
 
-**Warnings as soft assertions:**
-```nix
-warnings =
-  lib.optionals (config.nerv.secureboot.enable && !sbctlCovered)
-    [ "nerv: secureboot is enabled but /var/lib/sbctl is not covered by environment.persistence..." ];
-```
+**What IS NOT validated:**
+- Runtime functionality after system starts (e.g., services actually listening on configured ports)
+- Performance characteristics (boot time, memory usage, disk I/O)
+- Edge cases in initrd scripts (rollback, encryption, LVM activation)
+- Behavior under stress or failure conditions
+- Interactions between independently-enabled optional services
 
-Used when a misconfiguration is recoverable (key re-enrollment possible) vs `assertions` for unrecoverable situations (TPM wipe).
+**Why:**
+- Nix is a declarative configuration language; runtime behavior is determined by NixOS and the packages themselves
+- Comprehensive unit/integration testing would require a separate test harness (NixOS VM test suite)
+- Current validation model relies on successful system build + manual installation validation
+- Testing changes requires rebuilding and rebooting actual hardware
 
-## Coverage
+## Reproducibility
 
-**Requirements:** No numeric coverage targets. Coverage is measured by requirement satisfaction: each functional requirement (e.g., `DISKO-01`, `PROF-01`) maps to at least one verification command.
+**Locked Dependencies:**
+- Flake inputs pinned via `flake.nix` with specific versions: `disko v1.13.0`, `lanzaboote`, `home-manager` from `nixos-unstable`
+- `flake.lock` file (not readable, stores exact revisions) ensures bit-for-bit reproducibility
+- System builds are reproducible given the same flake.lock state
 
-**Tracked in:** `.planning/phases/<N>-<slug>/<N>-VALIDATION.md` Per-Task Verification Map
-
-**Gaps:** Anything marked `→ manual-only` is a coverage gap requiring human verification on a target machine. These are explicitly documented with test instructions.
-
-**Audit pattern:** Phase validations are retroactively audited and an audit section added:
-```markdown
-## Validation Audit 2026-03-10
-
-| Metric | Count |
-|--------|-------|
-| Gaps found | 5 |
-| Resolved (manual-only) | 5 |
-| Escalated | 0 |
-```
-
-## What Is Not Tested
-
-- No unit tests for individual Nix functions (helper functions in `let` bindings)
-- No NixOS VM test infrastructure (`nixosTest` / `testing.nix`) — not present in this repo
-- No CI pipeline (no `.github/workflows/`, no Garnix, no Hydra config)
-- No linting or formatting enforcement tooling (no `nixpkgs-fmt`, `alejandra`, or `statix` config)
-
-All functional correctness is validated manually on a NixOS target machine or deferred to `nix flake check`.
+**Testing Reproducibility:**
+- Installation manual (see MEMORY.md) is the source of truth for tested flow
+- Each installation is a fresh system with identical configuration (minus host-specific values)
+- Same flake + same hardware = same system state at boot
 
 ---
 
-*Testing analysis: 2026-03-10*
+*Testing analysis: 2026-03-12*

@@ -1,221 +1,231 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-03-10
-
----
+**Analysis Date:** 2026-03-12
 
 ## Tech Debt
 
-**Hardcoded `#host` nixosConfiguration in auto-upgrade and zsh aliases:**
-- Issue: `system.autoUpgrade.flake` is hardcoded to `/etc/nixos#host` in `modules/system/nix.nix`. Any host using the `server` nixosConfiguration will silently auto-upgrade using the wrong profile. The zsh aliases `nrs`, `nrb`, `nrt` in `modules/services/zsh.nix` are also hardcoded to `#host`.
-- Files: `modules/system/nix.nix` line 15, `modules/services/zsh.nix` lines 88–90
-- Impact: A server host running daily auto-upgrades applies `hostProfile` settings (audio, bluetooth, BTRFS rollback) instead of `serverProfile` (LVM, full impermanence). This is a silent misconfiguration that becomes dangerous if auto-upgrade fires on a headless server with a different disk layout.
-- Fix approach: Expose a `nerv.nix.autoUpgradeFlake` option (already listed as future requirement `OPT-V3-01`) or default the flake path to a configurable `nerv.hostname`-derived value. Short-term: document as "set manually per host".
+**Hard-Coded LUKS Label Synchronization:**
+- Issue: The LUKS device label "NIXLUKS" is duplicated across three modules without a canonical source. Changes to disko partition labels must be manually propagated.
+- Files: `modules/system/disko.nix` (line 30), `modules/system/secureboot.nix` (lines 87, 107, 112, 141)
+- Impact: If someone changes the LUKS label in disko.nix, Secure Boot and TPM2 binding will silently fail because systemd-cryptenroll targets the wrong device label. This could brick systems with Secure Boot enabled.
+- Fix approach: Extract the LUKS label as a shared NixOS option at the top level (e.g., `config.nerv.disko.luksLabel`) and reference it in both disko.nix and secureboot.nix via `config.nerv.disko.luksLabel`. This creates a single source of truth.
 
-**LVM option defaults are string `"PLACEHOLDER"` (not `null` or assertion-guarded):**
-- Issue: `nerv.disko.lvm.swapSize`, `nerv.disko.lvm.storeSize`, and `nerv.disko.lvm.persistSize` default to the string `"PLACEHOLDER"` in `modules/system/disko.nix` lines 51, 57, 63. There is no assertion that catches a literal `"PLACEHOLDER"` value reaching disko. A host using `nerv.disko.layout = "lvm"` without filling in sizes will pass a nonsensical string to `mkswap` and `mkfs.ext4`.
-- Files: `modules/system/disko.nix` lines 48–67
-- Impact: Silent disk provisioning failure at install time. The string `"PLACEHOLDER"` will be passed to disko partition size calculations and cause a cryptic error only at `nixos-install` time, not at `nix flake check` time.
-- Fix approach: Change defaults to `null` and add a `lib.optional (cfg.layout == "lvm")` assertion that rejects `null` or the literal string `"PLACEHOLDER"`.
+**Placeholder Configuration Trap:**
+- Issue: `hosts/configuration.nix` contains eight PLACEHOLDER values that must be manually replaced. Failure to replace them causes silent errors (empty hostname, wrong disk device, wrong layout type).
+- Files: `hosts/configuration.nix` (lines 14, 19-27, 31, 34, 37-39)
+- Impact: Users can successfully rebuild without modifying these values, resulting in systems with empty hostnames, mismatched disk layouts, or the wrong user. The only indication is a build error on hostname assertion (line 49 in identity.nix), but disko and LVM size errors are silent.
+- Fix approach: Create a validation script or pre-check that runs before nixos-rebuild to ensure no PLACEHOLDERs remain. Alternatively, use lib.mkDefault with an assertion that fires if any critical value is still the default.
 
-**Stale cross-references in `secureboot.nix` comments:**
-- Issue: Five inline comments in `modules/system/secureboot.nix` reference `disko-configuration.nix and boot.nix` — a file path that no longer exists (deleted in Phase 8) and a description that is inaccurate (LUKS is no longer in `boot.nix`). The correct reference is `modules/system/disko.nix` only.
-- Files: `modules/system/secureboot.nix` lines 85, 105, 110, 139 (inline comments)
-- Impact: Maintainers following the comment to locate the LUKS label sync point will look in a deleted file. Zero runtime impact.
-- Fix approach: Replace all `# must match disko-configuration.nix and boot.nix` comments with `# must match modules/system/disko.nix`.
+**Audit Rules as Custom Service (audit 4.x Compatibility):**
+- Issue: The NixOS `security.audit` module generates `-b/-f/-r` flags that were removed in audit 4.x. Rather than using the module, custom audit rules are loaded via `audit-rules` oneshot service.
+- Files: `modules/system/security.nix` (lines 21-50)
+- Impact: If someone tries to use `security.audit.*` options (which look normal in NixOS modules), they will override these manually-loaded rules, causing audit-rules-nixos.service to fail silently. The system runs without audit logging and users won't notice.
+- Fix approach: Add a hard assertion that `security.audit.enable == false` when `security.auditd.enable == true`. Document why the module can't be used. Consider filing an issue with NixOS to deprecate the incompatible options.
 
-**Stale comments in `modules/system/default.nix`:**
-- Issue: Line 14 describes `boot.nix` as `"initrd + LUKS + bootloader (opaque)"`. LUKS was moved out of `boot.nix` in Phase 10 into `disko.nix`. Line 16 describes `disko.nix` as `"conditional LVM LVs based on impermanence mode"` — predating Phase 9 where the condition became `nerv.disko.layout`, not impermanence mode.
-- Files: `modules/system/default.nix` lines 11, 13
-- Impact: Misleads maintainers about module responsibilities. Zero runtime impact.
-- Fix approach: Update line 14 to `"initrd + bootloader (opaque)"` and line 16 to `"declarative disk layout — BTRFS or LVM branch based on nerv.disko.layout"`.
-
-**Four VALIDATION.md files in draft/nyquist_compliant:false state:**
-- Issue: Phases 9, 10, 11, and 12 each have a `VALIDATION.md` with `status: draft` and `nyquist_compliant: false`. These represent incomplete process compliance records for completed implementation phases.
-- Files: `.planning/phases/09-btrfs-disko-layout/09-VALIDATION.md`, `.planning/phases/10-initrd-btrfs-rollback-service/10-VALIDATION.md`, `.planning/phases/11-impermanence-btrfs-mode/11-VALIDATION.md`, `.planning/phases/12-profile-wiring-and-documentation/12-VALIDATION.md`
-- Impact: Process compliance gap — no functional impact on the deployed NixOS system.
-- Fix approach: Run `/gsd:validate-phase` for phases 9, 10, 11, and 12 in order.
-
-**`disk-layout-refactor.md` superseded design document at repo root:**
-- Issue: `disk-layout-refactor.md` is a pre-GSD planning document that describes the refactor work now completed in Phases 9–11. It contains task lists and pseudo-implementation notes that do not match the final implementation (e.g. uses `btrfs subvolume delete @` without the LUKS layer, references `/btrfs/@` instead of `/btrfs_tmp/@`, no `@root-blank` snapshot step).
-- Files: `disk-layout-refactor.md`
-- Impact: New contributors reading this file get an incorrect picture of the rollback mechanism. Zero runtime impact.
-- Fix approach: Delete the file — the README Section B and PROF-04 documentation fully cover the current install procedure. Alternatively, add a header note that this document is a historical artifact superseded by Phase 9–11 implementation.
-
-**REQUIREMENTS.md OPT-07 text imprecision:**
-- Issue: `OPT-07` text says `default 22` for the SSH port. The implementation uses `default = 2222` for the SSH daemon port, with port 22 reserved for the endlessh tarpit (`tarpitPort`).
-- Files: `.planning/REQUIREMENTS.md` line 25
-- Impact: Documentation-only inaccuracy. Zero runtime impact.
-- Fix approach: Amend OPT-07 text to `default 2222 (port 22 reserved for endlessh tarpit)`.
-
----
+**Home Manager File Imports Outside Flake Boundary:**
+- Issue: Home Manager imports `/home/<user>/home.nix` which exists outside the flake and Git. This requires `nixos-rebuild --impure`.
+- Files: `home/default.nix` (line 44)
+- Impact: Flake purity is lost. `nix flake check` will fail unless `--impure` is added. CI/CD pipelines and unattended rebuilds fail. Users on machines without a user home.nix will get a configuration evaluation error.
+- Fix approach: Create per-user fallback stubs. If `/home/<user>/home.nix` doesn't exist, import a default minimal module that doesn't break the system. Alternatively, provide `hm-template/home.nix` as the default and document how to customize it.
 
 ## Known Bugs
 
-**No PLACEHOLDER enum validation on `nerv.hardware.cpu` and `nerv.hardware.gpu` in `hosts/configuration.nix`:**
-- Symptoms: The template `hosts/configuration.nix` sets `nerv.hardware.cpu = "PLACEHOLDER"`. The option type is `lib.types.enum [ "amd" "intel" "other" ]` which will reject `"PLACEHOLDER"` at eval time with a type error. This is the intended guard behavior, but the error message is generic and does not hint at valid values prominently.
-- Files: `hosts/configuration.nix` lines 22–23, `modules/system/hardware.nix` lines 11–19
-- Trigger: Running `nix flake check` or `nixos-rebuild` without filling in the PLACEHOLDER values.
-- Workaround: The enum type error fires early, before any disk operations.
+**Secure Boot First-Boot Race Condition (Documented but Unresolved):**
+- Symptoms: TPM2 LUKS auto-unlock fails after Secure Boot key enrollment if someone doesn't reboot between boot 1 and boot 2.
+- Files: `modules/system/secureboot.nix` (lines 32-39)
+- Trigger: User enrolls Secure Boot keys, the service attempts to bind LUKS to TPM2 in the same boot before reboot.
+- Workaround: The code checks if step 1 is done and exits (line 90-92). Subsequent boots attempt TPM2 binding. This works but is fragile — if someone disables the second service, the check never runs.
+- Root cause: PCR 7 (Secure Boot policy) doesn't reflect the active Secure Boot state until the next boot after key enrollment. Binding TPM2 before the reboot captures the wrong PCR 7 hash.
+- Improvement path: Automate the two-boot flow: make the first service do only enrollment and mandatory reboot, then validate that the second service only runs after reboot and PCR 7 is stable. Add systemd dependencies to prevent the second service from even starting until boot 2.
 
-**BTRFS rollback service mounts at `/btrfs_tmp` without cleanup on error:**
-- Symptoms: The rollback initrd script in `modules/system/disko.nix` mounts BTRFS at `/btrfs_tmp`, runs subvolume operations, then `umount /btrfs_tmp`. If `btrfs subvolume delete /btrfs_tmp/@` fails and the `|| true` suppression is insufficient (e.g. the subvolume is in use), the mount is still unmounted and `@` may be in an inconsistent state.
-- Files: `modules/system/disko.nix` lines 123–133
-- Trigger: First boot after a failed partial subvolume deletion, or if `/btrfs_tmp` already exists from a prior aborted initrd.
-- Workaround: Manual recovery via live ISO — `btrfs subvolume delete`, then restore snapshot manually. The `|| true` on the delete is intentional to handle first-boot where `@` may not yet exist, but it also swallows genuine errors.
+**BTRFS Rollback @root-blank Snapshot Must Exist Beforehand:**
+- Symptoms: Boot fails with "no subvolume found" if the @root-blank snapshot doesn't exist before the rollback service runs.
+- Files: `modules/system/disko.nix` (line 126-130, rollback service script)
+- Trigger: First boot when disko creates the BTRFS layout. The script looks for @root-blank but disko only creates it as an empty entry (no content) — the initial creation happens during partitioning, but if rollback service runs before disko finishes setup, it can fail.
+- Workaround: The script uses `|| true` on the delete command (line 127), so a missing snapshot doesn't fail the service, but a missing @root-blank source (line 130) will cause the snapshot to fail.
+- Root cause: Race between disko setup (which creates @root-blank) and the initrd rollback service.
+- Improvement path: Make the rollback service explicitly depend on the disko setup completing. Verify that @root-blank exists and is readable before attempting to snapshot it. Provide a clearer error message if it's missing.
 
----
+**Home Manager stateVersion Inheritance Assumes osConfig is Always Available:**
+- Symptoms: If a Home Manager user module doesn't pass osConfig correctly, `osConfig.system.stateVersion` will be undefined, causing a cryptic evaluation error.
+- Files: `home/default.nix` (line 46)
+- Trigger: Manually importing a user module outside the normal nixos-rebuild flow or testing Home Manager in isolation.
+- Workaround: None. The module assumes osConfig will always be available.
+- Root cause: Home Manager user modules aren't guaranteed to have osConfig in all evaluation contexts.
+- Improvement path: Use `lib.mkDefault` with a fallback stateVersion (e.g., "25.11") so the module is more forgiving if osConfig is unavailable. Document that osConfig is required in the options description.
 
 ## Security Considerations
 
-**SSH host keys persisted via `environment.persistence` bind-mounts require `/persist` to be unlocked before sshd starts:**
-- Risk: Both btrfs and full impermanence modes persist `ssh_host_ed25519_key` and `ssh_host_rsa_key` from `/persist`. If `/persist` is not available before sshd's first activation (e.g. if the bind-mount fails silently), sshd will generate new host keys at `/etc/ssh/`, which disappear on next rollback. This causes an SSH fingerprint mismatch for clients, not a security breach.
-- Files: `modules/system/impermanence.nix` lines 115–121, 144–150
-- Current mitigation: `fileSystems."/persist".neededForBoot = true` ensures the mount attempt is made before sshd. If the mount fails, the system will fail to boot (safe fail-closed behavior).
-- Recommendations: No change required — the `neededForBoot` guard is the correct defense. Document the recovery procedure (live ISO, `mount /persist`, verify bind-mounts) in the README or a dedicated troubleshooting section.
+**SSH Tarpit Port Bound to All Interfaces:**
+- Risk: The endlessh tarpit listens on all network interfaces (0.0.0.0:22). If a machine has multiple NICs, port 22 is exposed on all of them without filtering.
+- Files: `modules/services/openssh.nix` (line 72)
+- Current mitigation: The tarpit is slow and harmless — it just wastes bot connections. The real SSH daemon runs on a different port (2222 by default), so attackers can't log in via the tarpit.
+- Recommendations: Consider adding a per-NIC binding option (e.g., `nerv.openssh.tarpitBindAddr`) to restrict the tarpit to specific interfaces (e.g., WAN-facing only). Document the trade-offs: binding to all interfaces slows down port scanners globally, but adds noise if you have internal NICs.
 
-**`secureboot-enroll-keys` service runs with `User = "root"` and no `ProtectSystem` hardening:**
-- Risk: The two systemd services (`secureboot-enroll-keys`, `secureboot-enroll-tpm2`) in `modules/system/secureboot.nix` run as root with no `PrivateTmp`, `NoNewPrivileges`, or `ProtectSystem` constraints.
-- Files: `modules/system/secureboot.nix` lines 45–48, 80–83
-- Current mitigation: Both services are one-shot with sentinel files (`/var/lib/secureboot-keys-enrolled`, `/var/lib/secureboot-setup-done`) — they exit immediately on subsequent boots. The risk window is only the two-boot enrollment sequence.
-- Recommendations: Low priority given the one-shot nature and the fact that Secure Boot enrollment inherently requires full hardware access. Adding `ProtectSystem = "strict"` would conflict with the service's need to write sentinel files to `/var/lib`.
+**Audit Logging Scoped by auid (audit-rules Service):**
+- Risk: The audit rules skip processes without an auid (system/kernel processes) to avoid `audit_log_subj_ctx` errors. This means rootkits running as system processes without a login session won't be logged.
+- Files: `modules/system/security.nix` (lines 36-40)
+- Current mitigation: AIDE file integrity monitoring (daily timer) will detect tampering by rootkits even if they bypass audit logging.
+- Recommendations: Document this limitation in the code. Consider adding supplementary logging for system calls from pid 1 (init) or other critical daemons, even though they lack auid. Test if AppArmor confinement + audit on specific syscalls (like setuid/setgid on line 42) catches privilege escalation in system services.
 
-**`hardware.enableAllFirmware = true` allows arbitrary proprietary firmware blobs:**
-- Risk: `modules/system/hardware.nix` line 30 sets `hardware.enableAllFirmware = true`, which loads firmware blobs from `linux-firmware` for all detected hardware. This is a broad trust grant to upstream firmware vendors.
-- Files: `modules/system/hardware.nix` line 30
-- Current mitigation: NixOS pins firmware to a specific nixpkgs revision. `fwupd` is also enabled for runtime updates.
-- Recommendations: Acceptable risk for a desktop/laptop base library. Server deployments could consider replacing with the more targeted `hardware.enableRedistributableFirmware = true` only.
+**Secure Boot Keys Persisted in /var/lib/sbctl Without Backup:**
+- Risk: If a user enables Secure Boot, sbctl creates the PKI bundle in `/var/lib/sbctl`. If impermanence mode is "full" (/ as tmpfs), this directory is reset on every reboot unless explicitly persisted.
+- Files: `modules/system/impermanence.nix` (lines 73-85), `modules/system/secureboot.nix` (line 22)
+- Current mitigation: The impermanence module asserts that `/var/lib/sbctl` is not in tmpfs extraDirs (IMPL-02, line 73-85). If someone tries to add `/var/lib/sbctl` to impermanence tmpfs paths, the assertion catches it.
+- Recommendations: The assertion is defensive but doesn't prevent a user from disabling the assertion with lib.mkForce. Add a warning (already present on line 164-165 for BTRFS mode) to FULL mode as well. Recommend backing up `/var/lib/sbctl` after first enrollment: `sudo cp -r /var/lib/sbctl ~/sbctl-backup`.
 
-**Audit rules are very broad — high-volume noise risk:**
-- Risk: `modules/system/security.nix` lines 26–28 audit every `execve`, `openat`, and `connect` syscall system-wide. On an active desktop, this generates extremely high audit log volume and may fill `/var/log/audit/` rapidly, or degrade I/O performance on write-intensive workloads.
-- Files: `modules/system/security.nix` lines 24–37
-- Current mitigation: `/var/log` is excluded from AIDE monitoring. Audit log volume is not rate-limited.
-- Recommendations: Consider adding `-F uid!=root` filters to `execve` and `openat` rules, or adding `auditctl -r` rate limits to the audit configuration. This is a known trade-off; the current configuration prioritizes completeness over noise reduction.
+**LUKS Encryption with allowDiscards=true Leaks Trim Hints:**
+- Risk: TRIM (Secure Erase) pass-through is enabled for SSDs (disko.nix line 29). While this improves SSD performance, TRIM commands leak information about which sectors have been erased, which can help an attacker infer file deletions.
+- Files: `modules/system/disko.nix` (line 29)
+- Current mitigation: TRIM is necessary for SSD longevity and doesn't expose plaintext data. An attacker with physical access can already extract keys from memory or side-channels.
+- Recommendations: Document this trade-off in disko.nix. For highly sensitive deployments (e.g., servers handling classified data), consider disabling allowDiscards and accepting lower SSD lifespan. For consumer laptops, the current setting is appropriate.
 
----
-
-## Fragile Areas
-
-**`avahi.enable` is set independently by both `bluetooth.nix` and `printing.nix`:**
-- Files: `modules/services/bluetooth.nix` line 34, `modules/services/printing.nix` lines 28–31
-- Why fragile: Both modules set `services.avahi.enable = true` unconditionally within their respective `mkIf` blocks. NixOS merges these cleanly (true || true = true), but if a host wants to disable avahi for one service without the other it cannot do so without `lib.mkForce false` overriding both. If a future module ever tries to set `services.avahi.enable = false` for security reasons, it will conflict with both modules simultaneously.
-- Safe modification: Do not add `services.avahi.enable = false` to any other module without `lib.mkForce`. Understand that enabling either bluetooth or printing implies avahi is on.
-- Test coverage: No automated test. Verified only by build success (nix eval).
-
-**`home-manager` users require `nixos-rebuild --impure` and per-user `~/home.nix` files outside the flake boundary:**
-- Files: `home/default.nix` lines 44, 47
-- Why fragile: The `imports = [ /home/${name}/home.nix ]` path is an absolute filesystem reference outside the flake. If a listed user's `~/home.nix` does not exist, `nixos-rebuild` fails with an import error. The `home-manager.backupFileExtension = "backup"` guard prevents hard failures on conflicting unmanaged files, but cannot protect against the missing-file case.
-- Safe modification: Always ensure `~/home.nix` exists for every user listed in `nerv.home.users` before running `nixos-rebuild`. If removing a user from `nerv.home.users`, the `~/home.nix` file can be left in place without harm.
-- Test coverage: Not testable without a running NixOS system with actual user home directories.
-
-**`@root-blank` snapshot must be created manually during installation — not automated:**
-- Files: `modules/system/disko.nix` lines 89, 116–133
-- Why fragile: The initrd rollback service snapshots `@root-blank → @` on every boot. If `@root-blank` does not exist (e.g. installer skipped step 5 in README Section B), the rollback service exits 1 and the system may fail to mount `/`. This is a purely manual step with no automated guard at install time.
-- Safe modification: README Section B warns of this at the top of the section. Do not remove or reorder the `@root-blank` creation step from the install procedure.
-- Test coverage: None — install procedure is a manual process.
-
-**`secureboot.nix` must be the last import in `modules/system/default.nix`:**
-- Files: `modules/system/default.nix` line 14, `modules/system/secureboot.nix` line 15
-- Why fragile: `secureboot.nix` uses `boot.loader.systemd-boot.enable = lib.mkForce false` to override the unconditional `boot.loader.systemd-boot.enable = true` set in `boot.nix`. If any future module in the system imports list sets `systemd-boot.enable` after `secureboot.nix` without `lib.mkForce`, the override will hold correctly because `mkForce` always wins regardless of order. However, if `secureboot.nix` is moved earlier in the list, the semantic intent becomes harder to follow and future developers may add conflicting bootloader configuration expecting it to take precedence.
-- Safe modification: Keep `secureboot.nix` as the last entry in `modules/system/default.nix` imports list. The comment on line 2 of `default.nix` documents this constraint.
-- Test coverage: Verified by `nix flake check` presence of lanzaboote module.
-
-**`luks-cryptenroll` helper script is a plain bash one-liner with no safety checks:**
-- Files: `modules/system/secureboot.nix` lines 138–142
-- Why fragile: The `luks-cryptenroll` script runs `systemd-cryptenroll --wipe-slot=tpm2` unconditionally. If run on a system where TPM2 was never enrolled (e.g. after a fresh reinstall with Secure Boot disabled), `--wipe-slot=tpm2` will succeed vacuously but the subsequent boot will require manual LUKS password entry. There is no user-facing warning before destructive wipe.
-- Safe modification: Only run `luks-cryptenroll` after verifying `sbctl status` shows Secure Boot enabled and `systemd-cryptenroll /dev/disk/by-label/NIXLUKS` shows an existing TPM2 slot.
-- Test coverage: None.
-
----
+**ClamAV Daemon Runs with Update Frequency of 24x per Day:**
+- Risk: Virus definitions are checked 24 times per day, which means frequent updates from the virus database upstream. If the upstream CDN is compromised or uses an insecure transport, definitions could be poisoned. However, ClamAV has signature verification on updates.
+- Files: `modules/system/security.nix` (lines 54-57)
+- Current mitigation: ClamAV uses cryptographic verification for definition signatures. The frequency is reasonable for a desktop system.
+- Recommendations: If running on a server with no internet access, disable the updater and manually manage definitions via cold updates. Document the update frequency and what it means in comments.
 
 ## Performance Bottlenecks
 
-**ClamAV daemon (`clamd`) running continuously on desktop hosts:**
-- Problem: `modules/system/security.nix` enables `services.clamav.daemon.enable = true` unconditionally for all profiles, including the desktop host profile. `clamd` maintains an in-memory virus database (typically 400–600 MB RAM) and performs real-time file scanning hooks.
-- Files: `modules/system/security.nix` lines 40–44
-- Cause: Fully opaque module — no option to disable per-profile.
-- Improvement path: Expose `nerv.security.clamav.enable` option. A server-only or on-demand scan approach (`clamscan` in a cron job) may be more appropriate for desktops without file-sharing workloads.
+**BTRFS Rollback Service Runs on Every Boot (IO-Bound):**
+- Problem: The rollback service snapshots @root-blank to @ on every single boot, regardless of whether the root was modified. On SSDs with many files, this I/O (especially listing all subvolumes) could add noticeable boot time.
+- Files: `modules/system/disko.nix` (lines 116-133)
+- Cause: The service doesn't check if @ already matches @root-blank before deleting and re-snapshotting. It's defensive (always reset) but not optimized.
+- Improvement path: Before deleting @, check if it's already a snapshot of @root-blank or if / still contains the expected system files. If so, skip the rollback. Alternatively, snapshot incrementally (only copy changed blocks) using BTRFS send/receive for faster resets. Benchmark the impact on typical drives (NVMe vs. spinning disk) and document expected boot time overhead.
 
-**Aggressive audit rule breadth impacts I/O-bound workloads:**
-- Problem: Auditing every `openat` syscall on a development workstation performing compiler builds generates thousands of audit events per second, serialized through the kernel audit subsystem.
-- Files: `modules/system/security.nix` line 27
-- Cause: Opaque module design — no per-rule toggle available.
-- Improvement path: Add `auditctl -r 100` (rate-limit to 100 events/second) or scope `openat` to specific paths (`-F dir=/etc -F dir=/boot`).
+**ClamAV Daemon Scans All Files on Disk (Optional but Enabled):**
+- Problem: Real-time scanning via clamd can impact system responsiveness if the machine has many files or if a large copy operation happens (e.g., `git clone`, downloading large archives).
+- Files: `modules/system/security.nix` (lines 54-57)
+- Cause: ClamAV is enabled by default with no exclusions (e.g., /nix, /var/cache).
+- Improvement path: Add excludes for the Nix store and other high-churn directories. Alternatively, make the daemon configurable (e.g., `nerv.security.clamd.enable = true` with options for maxthreads, maxfiles, etc.). Benchmark impact on a system with a large /nix store.
 
----
+**Audit Rules with `connect` Syscall Logging (Every Network Connection):**
+- Problem: Logging every `connect()` syscall for auid>=1000 (line 40 in security.nix) creates a massive audit log, especially on servers with many clients.
+- Files: `modules/system/security.nix` (line 40)
+- Cause: Complete transparency for debugging, but the log will grow rapidly.
+- Improvement path: For servers, replace the broad `connect` rule with a rule for specific high-risk ports or services (e.g., only log if connect() targets privileged ports <1024). For desktops, the current setting is reasonable. Document this in comments.
+
+## Fragile Areas
+
+**Secure Boot TPM2 Binding Depends on Label-Based Device Lookup:**
+- Files: `modules/system/secureboot.nix` (lines 107-112)
+- Why fragile: The service uses `/dev/disk/by-label/NIXLUKS` to bind LUKS to TPM2. If the label is changed (in disko.nix) without updating secureboot.nix, the binding silently fails and the system falls back to password-protected LUKS. This isn't obviously wrong — the system still boots.
+- Safe modification: Always update the `luksDevice01` variable in secureboot.nix when changing the label in disko.nix. Add a validation script that checks both labels match. Or, extract the label to a shared NixOS option (see Tech Debt section).
+- Test coverage: No tests verify that TPM2 binding succeeds or that the label is consistent across modules.
+
+**Impermanence Mode Coupling (btrfs vs. full):**
+- Files: `modules/system/impermanence.nix` (lines 35-47), `modules/system/disko.nix` (lines 73-134)
+- Why fragile: The impermanence mode determines which directories are persisted and how. BTRFS mode expects disko layout to be "btrfs" (with subvolumes). Full mode expects / to be tmpfs. If someone sets `nerv.impermanence.mode = "full"` but `nerv.disko.layout = "btrfs"`, the result is two different persistence strategies competing (BTRFS subvolume @persist vs. tmpfs @ with bind mounts). This causes a boot-time conflict.
+- Safe modification: Add an assertion that enforces mode/layout matching: `(cfg.mode == "btrfs" && config.nerv.disko.layout == "btrfs") || (cfg.mode == "full" && config.nerv.disko.layout == "lvm")`. Document this coupling clearly.
+- Test coverage: No tests validate the mode/layout pairing.
+
+**ZSH Activation Script Depends on /etc/passwd Format:**
+- Files: `modules/services/zsh.nix` (lines 149-158)
+- Why fragile: The script reads `/etc/passwd` with `IFS=:` to extract usernames and home directories. If NixOS changes the passwd format or someone uses a non-standard userdb backend (e.g., LDAP), this script could silently skip users or fail.
+- Safe modification: Check that the script handles edge cases: users with colons in their home directory names, users with login shells that don't exist. Add error handling and logging to the activation script.
+- Test coverage: No tests verify that ~/.zshrc is created for all users with zsh as their shell.
+
+**Home Manager users Imported from Filesystem Outside NixOS Evaluation:**
+- Files: `home/default.nix` (line 44)
+- Why fragile: Importing `/home/<user>/home.nix` requires the file to exist during evaluation. If a user is listed in `nerv.home.users` but their home.nix doesn't exist, the entire system evaluation fails with a "file not found" error. There's no fallback.
+- Safe modification: Use `builtins.pathExists /home/${name}/home.nix` to check before importing, and provide a default minimal module if the file is missing. Or, require that a `hm-template/home.nix` is provided as a fallback.
+- Test coverage: No tests verify that all users in nerv.home.users have valid home.nix files.
+
+**disko.nix Depends on Device Path Provided in hosts/configuration.nix:**
+- Files: `modules/system/disko.nix` (lines 74-75), `hosts/configuration.nix` (line 31)
+- Why fragile: The disko config requires `disko.devices.disk.main.device` to be set in hosts/configuration.nix. If it's left as `/dev/PLACEHOLDER`, disko will attempt to partition `/dev/PLACEHOLDER` (which doesn't exist) or fail cryptically.
+- Safe modification: Add validation in disko.nix that asserts the device path doesn't contain "PLACEHOLDER" and is a recognized device (e.g., `/dev/nvme*`, `/dev/sd*`, `/dev/vd*`). Test that the assertion fires during dry-run evaluation.
+- Test coverage: No tests verify that the disko device path is valid before partitioning.
 
 ## Scaling Limits
 
-**`fileSystems."/" tmpfs size=2G` is hardcoded for full (server) impermanence mode:**
-- Current capacity: 2 GB RAM for the root tmpfs.
-- Limit: Server workloads with large ephemeral working sets (container images, build artifacts) will exhaust the root tmpfs and cause OOM or write failures.
-- Files: `modules/system/impermanence.nix` line 99
-- Scaling path: Expose as `nerv.disko.tmpfsSize` option (already listed as future requirement `DISKO-V3-01`).
+**AIDE File Integrity Database Growth on Large Filesystems:**
+- Current capacity: AIDE is configured to monitor `/boot`, `/etc`, `/bin`, `/sbin`, `/usr/bin`, `/usr/sbin`, `/lib`, `/usr/lib` — approximately 50K-200K files on a typical NixOS system.
+- Limit: If these directories exceed 1M files (rare), AIDE database generation and checks will become memory-intensive and slow. Gzip compression helps but there's a practical limit.
+- Scaling path: For large enterprise deployments, consider replacing AIDE with a real-time file integrity service (e.g., Samhain, TripWire) or using a centralized log collection system (e.g., ELK stack) to aggregate audit events.
 
----
+**Audit Log Retention (No Rotation Policy Configured):**
+- Current capacity: Audit logs go to `/var/log/audit/audit.log`. No rotation policy is set, so logs will grow unbounded until disk fills.
+- Limit: On a busy server with the current audit rules, the log can grow at 10-100 MB/day. On a 100 GB root partition, logs would fill in 1-10 years depending on activity.
+- Scaling path: Configure `auditd.log_file` with a rotation policy (e.g., rotate every 1GB or 7 days). Or, forward audit logs to a remote syslog server for centralized retention. Document the expected log growth rate.
+
+**OpenSSH fail2ban Jail on High-Traffic Servers:**
+- Current capacity: fail2ban tracks IP addresses and ban times in memory. For a server receiving 10K+ SSH connection attempts per second, the ban table could grow to millions of entries.
+- Limit: On a 4GB RAM system, fail2ban's memory usage could spike if the ban table isn't pruned. The default bantime of "24h" means old bans accumulate.
+- Scaling path: For high-traffic servers, increase bantime-increment to longer intervals and reduce bantime-increment.overalljails scope. Use a faster intrusion detection system (e.g., nftables with stateless rules) for DDoS mitigation. Or, switch to a more scalable solution like fail2ban with a database backend.
+
+**ClamAV Definition Updates on Bandwidth-Constrained Networks:**
+- Current capacity: With freshclam checking 24 times per day, update traffic is roughly 5-20 MB per check (full or delta definition download).
+- Limit: On a metered connection (e.g., 4G mobile), definitions could consume significant bandwidth. On a fully air-gapped network, freshclam will fail 24 times per day, filling logs.
+- Scaling path: Make update frequency configurable. For bandwidth-constrained deployments, reduce to once-daily checks. For air-gapped networks, disable the updater entirely and use offline definition packages.
 
 ## Dependencies at Risk
 
-**`nixpkgs` pinned to `nixos-unstable`:**
-- Risk: All inputs follow `nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable"`. Unstable channel packages can have breaking changes between `nix flake update` runs — this is by design for a base library, but host operators may be surprised by silent API changes in modules they override.
-- Files: `flake.nix` line 5
-- Impact: Any `nix flake update` on a host may pull breaking changes in nixpkgs that affect NERV modules (e.g. renamed service options, changed module defaults).
-- Migration plan: Consider providing a `nixos-25.11` stable-channel alternative reference. The `disko` input is already pinned to `v1.13.0`, which sets a good precedent.
+**Lanzaboote (Secure Boot Bootloader) at Risk of Becoming Unmaintained:**
+- Risk: Lanzaboote is a relatively new project (active but single-maintainer). If maintainership lapses, Secure Boot support in NixOS could bitrot. The flake pins a specific version (lanzaboote, no version specified — uses latest), so updates are automatic but unvetted.
+- Impact: Secure Boot stops working after a major NixOS release if Lanzaboote isn't updated. Machines with Secure Boot enabled could fail to boot.
+- Migration plan: Monitor the Lanzaboote GitHub repo for maintenance signals. Have a fallback plan to disable Secure Boot and use systemd-boot if Lanzaboote becomes unmaintained. Test Secure Boot disablement on a non-critical machine to verify the fallback works.
 
-**`disko` pinned to `v1.13.0` — may miss upstream fixes:**
-- Risk: Disko is pinned to a specific tag. The known limitation that `neededForBoot` is not supported on BTRFS subvolume mounts (issues #192, #594) is worked around inline. A newer disko version might fix this and allow removing the workaround, or might introduce new breaking changes.
-- Files: `flake.nix` line 21
-- Impact: Minimal — the workaround in `modules/system/impermanence.nix` line 129 is correct and self-documenting.
-- Migration plan: Periodically check disko changelog before bumping the pin.
+**disko Version Pinned to v1.13.0 (Could Diverge from nixpkgs):**
+- Risk: The flake pins disko to a specific version (v1.13.0) while nixpkgs is on unstable. If disko has a major breaking change in a future release, the system can't use the latest disko without manual flake updates. Conversely, if disko has a critical bug in v1.13.0, the system is stuck with it until the flake is updated.
+- Impact: Disk initialization may fail on new hardware if disko doesn't support the latest disk technologies or partition schemes. Existing systems may be vulnerable to disk-related bugs in the pinned version.
+- Migration plan: Periodically test newer disko versions in a branch. Use `nix flake update disko` to bump the version, but do so on a test system first. Monitor disko's changelog for bug fixes and breaking changes.
 
----
+**Home Manager Input Follows nixpkgs (Tight Coupling):**
+- Risk: The flake makes home-manager.nixpkgs follow nixpkgs. This means Home Manager is always on the same nixpkgs version as the system. If nixpkgs has a regression, both fail together.
+- Impact: A breaking change in nixpkgs could break both system and user home configurations simultaneously, with no way to roll back independently.
+- Migration plan: Consider decoupling home-manager's nixpkgs from the system's in future phases (e.g., allow pinning home-manager to a slightly older nixpkgs if needed for stability). For now, test nixpkgs updates in a branch before applying to production.
 
-## Missing Critical Features
-
-**No validation that `nerv.disko.layout` matches the installed disk filesystem:**
-- Problem: If an operator sets `nerv.disko.layout = "lvm"` on a machine that has a BTRFS layout (or vice versa), the initrd will try to activate LVM on a device with no LVM PV, causing an initrd hang, or the BTRFS rollback service will not run on a machine that needs it.
-- Blocks: Safe profile switching without reinstallation.
-- Files: `modules/system/disko.nix` (no cross-validation with hardware state)
-
-**No `nerv.nix.autoUpgrade` toggle — auto-upgrade is always on:**
-- Problem: `system.autoUpgrade` is unconditionally enabled in `modules/system/nix.nix`. Hosts where automatic upgrades are undesirable (e.g. production servers, machines with manual deployment workflows) have no supported way to disable it without `lib.mkForce`.
-- Blocks: Adopting NERV for servers where upgrades must be coordinated.
-- Files: `modules/system/nix.nix` lines 12–17
-- Future requirement: `OPT-V3-01` covers this.
-
-**No kernel package toggle — Zen kernel is mandatory:**
-- Problem: `modules/system/kernel.nix` uses `lib.mkForce pkgs.linuxPackages_zen`. While `lib.mkForce` is documented as the escape hatch, the Zen kernel may not be desirable on server profiles (server-optimized or `linuxPackages_hardened` would be more appropriate).
-- Files: `modules/system/kernel.nix` line 10
-- Future requirement: `OPT-V3-02` covers this.
-
----
+**Linux Latest Kernel (Always Upgrading):**
+- Risk: `boot.kernelPackages = pkgs.linuxPackages_latest;` in boot.nix means every nixos-rebuild pulls the absolute latest kernel from nixpkgs. If a kernel has a regression (e.g., breaks a driver), all systems rebuild into the broken kernel.
+- Impact: Systems could become unbootable after a simple nixos-rebuild if the latest kernel has a critical bug.
+- Migration plan: Test kernel upgrades on a non-critical machine first. Consider switching to `linuxPackages_6_12` (pinned LTS version) for production systems. Make kernel version configurable per-host if stability is a priority.
 
 ## Test Coverage Gaps
 
-**No automated `nix flake check` in CI:**
-- What is not tested: Nix expression correctness, option type validation, and import chain completeness are never automatically verified. All validation is manual and developer-machine-dependent.
-- Files: All `.nix` files
-- Risk: A syntax error or type mismatch in any module goes undetected until a human runs `nix flake check` on a NixOS machine.
-- Priority: High — a CI pipeline running `nix flake check` in a nix-enabled GitHub Actions or Hydra environment would catch all eval-time errors.
+**Untested: Secure Boot Two-Boot Enrollment Sequence:**
+- What's not tested: The actual flow of TPM2 enrollment across two boots. The secureboot-enroll-keys and secureboot-enroll-tpm2 services have interdependencies (step 1 must complete, then reboot, then step 2 can run) that aren't validated.
+- Files: `modules/system/secureboot.nix` (lines 41-120)
+- Risk: If a user disables one of the services or has a systemd ordering issue, the second step may never run, and LUKS will stay on password-only mode. No test catches this.
+- Improvement: Create a NixOS test (using nixosTest framework) that simulates the two-boot flow: first boot enrolls keys, reboots, second boot binds TPM2, and verifies the LUKS device has the tpm2 slot. Add a test that verifies the assertion for PCR 7 stability.
 
-**No runtime integration tests for impermanence behavior:**
-- What is not tested: That the BTRFS rollback service actually deletes `@` and snapshots `@root-blank → @` correctly; that `environment.persistence` bind-mounts are available before sshd and NetworkManager start; that `machine-id` survives reboots.
-- Files: `modules/system/disko.nix` lines 116–133, `modules/system/impermanence.nix` lines 135–150
-- Risk: Regression in rollback ordering (e.g. `before`/`after` unit changes) goes undetected until first-boot failure on a physical machine.
-- Priority: High — NixOS `nixosTest` VM-based tests can exercise the full boot sequence including initrd services.
+**Untested: Impermanence Mode / Disko Layout Coupling:**
+- What's not tested: The interaction between impermanence.mode (btrfs vs. full) and disko.layout. No test verifies that mismatched modes cause an error or that matched modes work correctly.
+- Files: `modules/system/impermanence.nix`, `modules/system/disko.nix`
+- Risk: A user could accidentally create an unsupported configuration (e.g., mode="full" with layout="btrfs") and discover it only at boot time.
+- Improvement: Add a NixOS assertion (or test) that validates the pairing at evaluation time, not boot time.
 
-**No test coverage for Secure Boot two-boot enrollment sequence:**
-- What is not tested: That `secureboot-enroll-keys` correctly detects Setup Mode and does not re-run after the sentinel file is written; that `secureboot-enroll-tpm2` correctly orders after `secureboot-enroll-keys` and respects the TPM2-already-enrolled check.
-- Files: `modules/system/secureboot.nix` lines 39–118
-- Risk: A regression in the sentinel file path or the `sbctl status` grep pattern causes re-enrollment on every boot, which re-seals TPM2 to a different PCR state and breaks auto-unlock.
-- Priority: Medium — Secure Boot Setup Mode cannot be reliably mocked in NixOS VM tests, but the service logic can be unit-tested in isolation.
+**Untested: LUKS Device Label Consistency:**
+- What's not tested: Verification that the LUKS label in disko.nix matches the label used by boot.nix and secureboot.nix.
+- Files: `modules/system/disko.nix`, `modules/system/secureboot.nix`, `modules/system/boot.nix`
+- Risk: Label mismatches can cause silent failures in Secure Boot TPM2 binding.
+- Improvement: Add a test that parses disko.nix and secureboot.nix to extract the label and asserts they're equal. Or, extract the label to a shared NixOS option and test that it's used consistently.
 
-**`hosts/hardware-configuration.nix` is an empty placeholder:**
-- What is not tested: Any hardware-specific kernel module, driver, or filesystem configuration that would normally be generated by `nixos-generate-config`. The tracked placeholder `{ ... }: { }` means the flake builds in the repo but the built system has no hardware-specific modules.
-- Files: `hosts/hardware-configuration.nix`
-- Risk: Not a concern for the library itself, but consumers who forget to replace this file with the actual `nixos-generate-config` output will have a system that may fail to detect hardware at boot.
-- Priority: Low — this is by design for the template; the README documents the replacement step.
+**Untested: BTRFS Rollback Snapshot Creation:**
+- What's not tested: The rollback service (in disko.nix initrd) successfully creates the @ snapshot from @root-blank on the first boot.
+- Files: `modules/system/disko.nix` (lines 116-133)
+- Risk: If @root-blank doesn't exist or the snapshot command fails, the initrd hangs or panics. No test catches this.
+- Improvement: Create a NixOS test that mounts a BTRFS volume with @root-blank and verifies the rollback service creates @ correctly. Test both successful rollback and error conditions (missing @root-blank, permissions issues).
+
+**Untested: Home Manager File Import Fallback:**
+- What's not tested: Home Manager evaluation when `/home/<user>/home.nix` doesn't exist.
+- Files: `home/default.nix` (line 44)
+- Risk: If a user is added to `nerv.home.users` but their home.nix doesn't exist, the system fails to evaluate. No test prevents this.
+- Improvement: Create a test that evaluates a NixOS config with a user in nerv.home.users but without a home.nix file, and verify it either errors gracefully or uses a fallback.
+
+**Untested: ZSH Activation Script Edge Cases:**
+- What's not tested: The ~/.zshrc creation script (zsh.nix lines 149-158) handles unusual /etc/passwd formats, special characters in home directories, or missing home directories.
+- Files: `modules/services/zsh.nix`
+- Risk: For a user with a colon or newline in their home directory path, the script could silently skip them or create .zshrc in the wrong location.
+- Improvement: Create a test that adds users with edge-case home directories and verifies ~/.zshrc is created correctly for all.
+
+**Untested: SSH Tarpit Endlessh Binding to All Interfaces:**
+- What's not tested: Verification that endlessh successfully binds to port 22 on all interfaces.
+- Files: `modules/services/openssh.nix` (line 72)
+- Risk: If port 22 is already in use (e.g., from a previous SSH daemon), endlessh fails to bind silently, and the "tarpit" is ineffective.
+- Improvement: Add a test that starts the services, verifies port 22 responds with a slow SSH banner (endlessh), and port 2222 responds with a real SSH daemon.
 
 ---
 
-*Concerns audit: 2026-03-10*
+*Concerns audit: 2026-03-12*

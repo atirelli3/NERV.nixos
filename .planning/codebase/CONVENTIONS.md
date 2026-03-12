@@ -1,219 +1,206 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-03-10
-
-## Language Context
-
-This is a pure Nix/NixOS codebase. All source files are `.nix`. There is no JavaScript, TypeScript, Python, or other scripting language. Conventions below are specific to the Nix expression language and NixOS module system.
-
-## File Header Convention
-
-Every `.nix` file opens with a comment block stating the module's path and a one-line purpose summary:
-
-```nix
-# modules/system/boot.nix
-#
-# Layout-agnostic initrd and bootloader (systemd-boot + EFI). Layout-specific initrd config lives in disko.nix.
-```
-
-Pattern: `# <relative-path-from-repo-root>` on line 1, `#` blank line, `# <one-sentence description>` on line 3.
-
-## Module Function Signatures
-
-All NixOS modules use the full destructured argument list, even when not all args are used:
-
-```nix
-{ config, lib, pkgs, ... }:
-```
-
-Opaque modules (no options defined, only config) omit unused args:
-
-```nix
-{ pkgs, ... }:   # boot.nix — no options, only pkgs needed
-{ config, lib, pkgs, ... }:  # modules with options always include all three
-```
+**Analysis Date:** 2026-03-12
 
 ## Naming Patterns
 
 **Files:**
-- `kebab-case.nix` for module files: `openssh.nix`, `secureboot.nix`, `pipewire.nix`
-- `default.nix` for aggregator/index files at each directory level
+- Nix modules use lowercase with hyphens: `openssh.nix`, `pipewire.nix`, `hardware.nix`
+- Directory names are lowercase: `modules/system/`, `modules/services/`, `hosts/`, `home/`
+- Template files use lowercase: `hm-template/`
+- Multi-word names use hyphens: `disko.nix`, `secureboot.nix`, `zsh.nix`
 
-**Option namespaces:**
-- All custom options live under `nerv.*`: `nerv.hostname`, `nerv.openssh.enable`, `nerv.disko.layout`
-- Sub-namespaces match the module filename: `openssh.nix` → `nerv.openssh.*`, `disko.nix` → `nerv.disko.*`
-- Boolean toggles use `lib.mkEnableOption` for disabled-by-default: `lib.mkEnableOption "PipeWire audio stack"`
-- Boolean options that default to `true` use explicit `lib.mkOption { type = lib.types.bool; default = true; }` (see `zsh.nix`, `home/default.nix`)
+**Functions:**
+- Nix expressions use camelCase for function parameters: `cfg`, `isBtrfs`, `isLvm`
+- Binding names follow Nix conventions: short, descriptive lowercase with underscores for helper bindings
+- Pattern: `let binding = expression; in { ... }` for local computations
 
-**Local config binding:**
-- Always bind `config.nerv.<module>` to `cfg` at the top of the `let` block:
-  ```nix
-  let
-    cfg = config.nerv.openssh;
-  in
-  ```
-- Layout booleans extract to named predicates: `isBtrfs = cfg.layout == "btrfs";`
+**Variables:**
+- Configuration references use dot notation: `config.nerv.hostname`, `config.nerv.disko.layout`
+- Prefix commonly used config values: `cfg = config.nerv.*` (see all system and service modules)
+- Boolean flags use clear predicates: `isBtrfs`, `isLvm`, `isSbctlPath`
 
-**Subvolume names:**
-- BTRFS subvolumes use `@`-prefix convention: `/@`, `/@home`, `/@nix`, `/@persist`, `/@log`, `/@root-blank`
+**Types:**
+- Nix type declarations are explicit: `lib.types.str`, `lib.types.bool`, `lib.types.enum [ "..." ]`
+- Option types use precise enum constraints where appropriate: `lib.types.enum [ "btrfs" "lvm" ]` in `modules/system/disko.nix:38`
+- Attribute set types: `lib.types.attrsOf (lib.types.attrsOf lib.types.str)` in `modules/system/impermanence.nix:64`
 
-**Disk labels:**
-- UPPERCASE: `NIXLUKS`, `NIXBTRFS`, `NIXBOOT`, `NIXSTORE`, `NIXSWAP`, `NIXPERSIST`
+## Code Style
 
-## Option Declarations
+**Formatting:**
+- No explicit formatter detected (not using prettier, biome, or similar)
+- Manual formatting with consistent indentation (2 spaces)
+- Long lines broken across multiple lines for readability
+- Comments precede code blocks (not inline)
 
-Options follow a consistent four-field layout with aligned columns:
+**Linting:**
+- No linting configuration detected (.eslintrc, .prettierrc, biome.json absent)
+- Style enforced through manual review and community conventions
+- Code quality depends on human consistency
 
+**Ordering:**
+- File structure is consistent across all modules:
+  1. File header comment (filename + description + profile cross-reference)
+  2. Function signature with destructured arguments
+  3. Optional `let` bindings for local computations
+  4. `in` keyword with single expression (always an attrset)
+  5. Config body with `options` defined first, then `config` implementation
+
+Example from `modules/services/openssh.nix`:
 ```nix
-lib.mkOption {
-  type        = lib.types.str;
-  default     = "UTC";
-  description = "System time zone. See 'timedatectl list-timezones'.";
-  example     = "Europe/Rome";
-};
-```
-
-- `type`, `default`, `description`, `example` — always in this order
-- Column-aligned with spaces (not tabs)
-- `description` ends with a period and includes usage guidance where needed
-- Options intentionally without defaults (forcing explicit declaration) omit the `default` field and document this in the description: `"intentionally no default — forces explicit declaration per host"`
-- `lib.mkEnableOption` is used for simple boolean on/off options that default `false`
-
-## Config Blocks
-
-**Guard pattern:** All configurable modules wrap their `config` block in `lib.mkIf cfg.enable`:
-
-```nix
-config = lib.mkIf cfg.enable {
-  ...
-};
-```
-
-**Multi-branch pattern:** Conditional layout logic uses `lib.mkMerge` with `lib.mkIf` per branch:
-
-```nix
-config = lib.mkMerge [
-  (lib.mkIf isBtrfs { ... })
-  (lib.mkIf isLvm   { ... })
-  { ... }  # unconditional shared config at the end
-];
-```
-
-**Merged identity + conditional:** When a module has both unconditional config and conditional sections:
-
-```nix
-config = lib.mkIf cfg.enable (lib.mkMerge [
-  { ... }                                # unconditional when enabled
-  (lib.mkIf (cfg.mode == "full")  { ... })
-  (lib.mkIf (cfg.mode == "btrfs") { ... })
-]);
-```
-
-## Aggregator Modules
-
-Aggregator `default.nix` files are minimal one-liners:
-
-```nix
-# modules/default.nix
+# modules/services/openssh.nix
 #
-# Top-level aggregator — imports system, services, and home module subtrees.
-{ imports = [ ./system ./services ../home ]; }
+# SSH daemon hardened with endlessh tarpit and fail2ban. Disabled by default.
+
+{ config, lib, pkgs, ... }:
+
+let
+  cfg = config.nerv.openssh;
+in {
+  options.nerv.openssh = { ... };
+  config = lib.mkIf cfg.enable { ... };
+};
 ```
 
-No options, no config logic. Only an `imports` list.
+## Import Organization
 
-## Alignment and Formatting
+**Module Imports:**
+- System modules aggregated in `modules/system/default.nix` with explicit comments indicating dependencies
+- Services aggregated in `modules/services/default.nix` with explicit enable flags
+- Flake entry point `flake.nix` composes all modules with clear separation of concerns
 
-- Attrset values are column-aligned when grouped by logical purpose:
-  ```nix
-  nerv.disko.layout         = "btrfs";
-  nerv.openssh.enable       = true;
-  nerv.audio.enable         = true;
-  nerv.bluetooth.enable     = true;
-  ```
-- Option declarations use consistent 8-space column alignment for `type`, `default`, `description`, `example`
-- Single-line attrsets for trivial configs; multi-line with alignment for 3+ keys
+**Path Aliases:**
+- No explicit path aliases used
+- Direct file imports via relative paths: `./identity.nix`, `./openssh.nix`
+- Absolute paths for host-level imports in Home Manager: `imports = [ /home/${name}/home.nix ]` in `home/default.nix:44`
 
-## Assertions
+**Attribute Set Merging:**
+- `lib.mkMerge [ ... ]` used for conditional configuration branches
+- Single attrsets for unconditional config
+- `lib.mkIf` guards conditional blocks: `lib.mkIf isBtrfs { ... }` (see `modules/system/disko.nix:73`)
 
-Validation assertions follow a two-field pattern in the `assertions` list:
+## Error Handling
 
+**Assertions:**
+- NixOS assertions used for configuration validation
+- Checked at evaluation time before system build
+- Pattern: `assertions = [{ assertion = condition; message = "error message"; }]`
+- Example in `modules/services/openssh.nix:48-51`:
 ```nix
 assertions = [{
   assertion = cfg.tarpitPort != cfg.port;
   message   = "nerv.openssh.tarpitPort (${toString cfg.tarpitPort}) must differ from nerv.openssh.port (${toString cfg.port}).";
 }];
 ```
+- Complex assertion in `modules/system/impermanence.nix:74-85` validates sbctl path conflicts
 
-- `message` always prefixed with `"nerv: "` or `"nerv.<module>: "` for attribution
-- `lib.optional` used when assertion is itself conditional:
-  ```nix
-  assertions = lib.optional config.nerv.secureboot.enable { ... };
-  ```
+**Fallback Values:**
+- Default values specified in option declarations: `default = 2222;` in `modules/services/openssh.nix:15`
+- Placeholder defaults for mandatory options: `default = "PLACEHOLDER";` in `modules/system/disko.nix:51` (forces explicit user configuration)
+- Conditional fallbacks using `lib.optionalAttrs`: see `modules/system/identity.nix:65` for optional zsh shell assignment
 
-## Warnings
+## Logging
 
-Recoverable issues use `lib.warn` (not `assertions`) to preserve `nix flake check` during migrations:
+**Framework:** Nix has no runtime logging mechanism; all logging happens at system level via systemd services
 
-```nix
-warnings =
-  lib.optionals (config.nerv.secureboot.enable && !sbctlCovered)
-    [ "nerv: secureboot is enabled but /var/lib/sbctl is not covered by environment.persistence..." ];
-```
+**Patterns:**
+- Configuration-time output via `lib.mkMerge` tracing (hidden unless `--show-trace` is used)
+- Runtime logging delegated to systemd services and journalctl
+- System logs written via `systemd.services.<name>.serviceConfig.ExecStart` scripts
+- Example: audit rules loaded in `modules/system/security.nix:27-51` with service output to journal
+- AIDE check results logged to journal: `journalctl -u aide-check` (see `modules/system/security.nix:112`)
 
-## Overrides
-
-- `lib.mkForce` is used only when a downstream module must override a setting from an upstream module (e.g., `secureboot.nix` sets `boot.loader.systemd-boot.enable = lib.mkForce false`)
-- `lib.mkDefault` is used for settings that callers should be able to override:
-  ```nix
-  fileSystems."${cfg.persistPath}".neededForBoot = lib.mkDefault true;
-  ```
-
-## Shell Scripts Embedded in Nix
-
-Scripts inside `serviceConfig.script` or `pkgs.writeTextFile` blocks:
-
-- Include step-by-step inline comments
-- Use idempotency guards with sentinel files (`/var/lib/secureboot-keys-enrolled`)
-- Always include `|| true` on `btrfs subvolume delete` to prevent initrd failures
-- Reference packages via `${pkgs.<package>}/bin/<binary>` rather than bare names
+**Script Logging:**
+- Shell scripts within `pkgs.writeShellScript` use `echo` or direct output
+- Example in `modules/system/disko.nix:123-133` rollback service outputs to initrd logs
+- `echo` statements used in zsh initialization script (`modules/services/zsh.nix:98-143`)
 
 ## Comments
 
-- Inline comments on same line for brief clarifications: `# required for boot.initrd.systemd.services.*`
-- Block comments above logical groups with `# ── Section Name ────` decorators:
-  ```nix
-  # ── BTRFS branch ─────────────────────────────────────────────────────
-  ```
-- Cross-module sync notes use `# must stay in sync with <file>` or `# must match <file> and <file>`
-- "Intentional" decisions documented inline to prevent future "cleanup" reversions:
-  ```nix
-  # intentionally no default — forces explicit declaration per host
-  ```
-- Commented-out optional config is preserved with explanatory comments (e.g., jackd support in `pipewire.nix`, disabled plugins in `zsh.nix`)
+**When to Comment:**
+- File header required at top: filename, description, and relevant profile/mode information
+- Section headers use `# ── Section Name ────────` (80-character lines with visual separator)
+- Inline comments explain non-obvious decisions and workarounds
+- TODO/FIXME comments rare; none detected in codebase
 
-## Error Handling
+**JSDoc/TSDoc:**
+- Not applicable (Nix language, not TypeScript/JavaScript)
+- Option descriptions use Nix multiline strings with `''...'` syntax
+- Example from `modules/system/identity.nix:10-44`:
+```nix
+options.nerv.hostname = lib.mkOption {
+  type        = lib.types.str;
+  description = "Machine hostname. Sets networking.hostName. Required — no default.";
+  example     = "nixos-workstation";
+};
+```
 
-NixOS modules have no runtime error handling — all validation is at evaluation time:
-- Type errors caught by `lib.types.*` declarations (evaluated at `nixos-rebuild` time)
-- Logic errors caught by `assertions` (evaluated at `nixos-rebuild` time)
-- Recoverable conditions use `warnings` (display-only, build continues)
-- Hard invariants use `assertions` (build fails)
+**Multiline Descriptions:**
+- Use triple-quoted strings for detailed option documentation
+- Example from `modules/system/impermanence.nix:37-46`:
+```nix
+description = ''
+  Impermanence mode.
+    btrfs — Root stays on BTRFS @; rollback service resets @ on each boot...
+    full  — / as tmpfs (resets on reboot); /persist holds system state via...
+  Intentionally no default — forces explicit declaration per host;
+  consistent with nerv.disko.layout and nerv.hostname.
+'';
+```
 
-## Module Opacity Levels
+## Function Design
 
-Modules are explicitly categorised in their header comments:
-- **"Fully opaque"** — no user-facing options; use `lib.mkForce` to override: `nix.nix`, `kernel.nix`, `security.nix`
-- **"Always-on"** — activated unconditionally, no enable toggle: `packages.nix`, `security.nix`
-- **"Disabled by default"** — require explicit `enable = true`: `openssh.nix`, `pipewire.nix`, `bluetooth.nix`, `printing.nix`, `secureboot.nix`, `impermanence.nix`
-- **"Enabled by default"** — active unless overridden: `zsh.nix`, `home/default.nix`
+**Size:** Functions (let bindings) are typically single expressions composed with built-in NixOS/nixpkgs functions
 
-## Import / Module Structure
+**Parameters:**
+- Module parameters always destructured: `{ config, lib, pkgs, ... }`
+- `...` used to ignore unused parameters
+- Discriminated parameters in `let` bindings for clarity: `cfg = config.nerv.*` binds frequently-used values
 
-- `imports` lists in `default.nix` aggregators always reference files without `.nix` extension for directories: `./system`, `./services`
-- Explicit load order enforced via comments where it matters: `# secureboot.nix must be last`
-- Cross-module references are explicit: `config.nerv.zsh.enable` accessed from `identity.nix`
+**Return Values:**
+- All modules return a single attrset: `{ options = {...}; config = {...}; }`
+- Conditional returns wrapped in `lib.mkIf`: returns the attrset only if condition is true
+- Merged configs use `lib.mkMerge [ { ... } { ... } ]` for multiple conditional branches
+- No explicit error returns; invalid configs caught by assertions before evaluation completes
+
+## Module Design
+
+**Exports:**
+- Flake modules exported via `nixosModules` attrset in `flake.nix:65-72`
+- Granular exports enable selective composition: `default`, `system`, `services`, `home`
+- Each module self-contained; no cross-module function exports
+
+**Barrel Files:**
+- `modules/system/default.nix` and `modules/services/default.nix` aggregate their children
+- Simple re-export pattern: `{ imports = [ ./file1.nix ./file2.nix ]; }`
+- Matches NixOS module composition conventions
+
+**Option Naming:**
+- All custom options scoped under `nerv.*`: `nerv.hostname`, `nerv.disko.layout`, `nerv.openssh.enable`
+- Prevents namespace pollution and makes custom options easily identifiable
+- Nested options for related functionality: `nerv.disko.lvm.swapSize`, `nerv.locale.timeZone`
+
+## Conditional Configuration
+
+**lib.mkIf Pattern:**
+- Used to conditionally enable/disable entire module blocks based on enable flags
+- Example: `config = lib.mkIf cfg.enable { ... }` in `modules/services/openssh.nix:47`
+- Nested conditions for complex logic: `(lib.mkIf (cfg.cpu == "amd") { ... })` in `modules/system/hardware.nix:43`
+
+**lib.mkMerge Pattern:**
+- Used to combine multiple conditional branches into one attrset
+- Returns list of attrsets that are merged in order
+- Example from `modules/system/disko.nix:70-191` with BTRFS and LVM branches
+
+**lib.mkForce Pattern:**
+- Override inherited values: `boot.kernelPackages = lib.mkForce pkgs.linuxPackages_zen;` in `modules/system/kernel.nix:10`
+- Used when a module needs to enforce a value against defaults
+- Comments indicate when users should override with `lib.mkForce` if needed (e.g., in `modules/system/hardware.nix:55`)
+
+**lib.optionalAttrs Pattern:**
+- Conditionally add attributes: `{ shell = pkgs.zsh; } // lib.optionalAttrs config.nerv.zsh.enable { ... }`
+- Example in `modules/system/identity.nix:63-67` for optional zsh shell assignment per user
 
 ---
 
-*Convention analysis: 2026-03-10*
+*Convention analysis: 2026-03-12*
