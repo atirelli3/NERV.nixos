@@ -1,5 +1,14 @@
 # Milestones: nerv.nixos
 
+## v2.0 Stateless NixOS Library (Shipped: 2026-03-12)
+
+**Phases completed:** 13 phases, 35 plans, 0 tasks
+
+**Key accomplishments:**
+- (none recorded)
+
+---
+
 ## v1.0 — Foundation (Complete)
 
 **Shipped:** 2026-03-08

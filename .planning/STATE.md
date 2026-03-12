@@ -1,36 +1,36 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Phase Details
-status: planning
-stopped_at: Completed 13-audit-gap-closure 13-02-PLAN.md
-last_updated: "2026-03-12T18:50:02.792Z"
-last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
+milestone: v3.0
+milestone_name: (next milestone — run /gsd:new-milestone)
+status: milestone_complete
+stopped_at: v2.0 shipped 2026-03-12
+last_updated: "2026-03-12T00:00:00.000Z"
+last_activity: 2026-03-12 — v2.0 milestone complete, archived
 progress:
   total_phases: 13
   completed_phases: 13
   total_plans: 35
   completed_plans: 35
-  percent: 0
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-09)
+See: .planning/PROJECT.md (updated 2026-03-12 after v2.0)
 
 **Core value:** A user declares only their machine-specific parameters and gets a secure, well-documented NixOS system out of the box.
-**Current focus:** v2.0 — Stateless Disk Layout (phases 9–12)
+**Current focus:** v2.0 shipped — planning v3.0 next
 
 ## Current Position
 
-Phase: Phase 9 — BTRFS Disko Layout (not started)
+Phase: —
 Plan: —
-Status: Roadmap complete, ready to plan Phase 9
-Last activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
+Status: v2.0 milestone complete. Start next milestone with `/gsd:new-milestone`.
+Last activity: 2026-03-12 — v2.0 archived (13 phases, 35 plans, 33 requirements)
 
-Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
+Progress: [██████████] 100% (v2.0 complete)
 
 ## Performance Metrics
 
