@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Phase Details
 status: planning
-stopped_at: Completed 13-04-PLAN.md
-last_updated: "2026-03-12T18:46:54.440Z"
+stopped_at: Completed 13-audit-gap-closure 13-02-PLAN.md
+last_updated: "2026-03-12T18:47:16.812Z"
 last_activity: 2026-03-09 — v2.0 roadmap created (phases 9–12)
 progress:
   total_phases: 13
@@ -87,6 +87,8 @@ Progress: [░░░░░░░░░░] 0% (v2.0 milestone)
 | Phase 12-profile-wiring-and-documentation P03 | 4 | 2 tasks | 1 files |
 | Phase 13-audit-gap-closure P03 | 5 | 1 tasks | 3 files |
 | Phase 13-audit-gap-closure P04 | 1 | 1 tasks | 1 files |
+| Phase 13-audit-gap-closure P01 | 2 | 2 tasks | 1 files |
+| Phase 13-audit-gap-closure P02 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -181,6 +183,9 @@ Recent decisions affecting current work:
 - [Phase 12-profile-wiring-and-documentation]: impermanence module note broadened to cover both btrfs (host) and full (server) modes
 - [Phase 13-audit-gap-closure]: # Profiles : line inserted after description line (line 3) and before blank separator (line 5) in each module header — preserves structure and keeps function args at line 6
 - [Phase 13-audit-gap-closure]: disko.nix comment updated to reflect Phase 9/10 reality: branching on nerv.disko.layout, not impermanence mode, plus layout-conditional initrd services
+- [Phase 13-audit-gap-closure]: server let-binding contains exactly three options (nerv.disko.layout = lvm, nerv.impermanence.enable = true, nerv.impermanence.mode = full) — nerv.openssh.enable omitted, leaving SSH at module default
+- [Phase 13-audit-gap-closure]: nixosConfigurations.server module list is structurally identical to host in module order and inputs; only the attrset reference changes from host to server
+- [Phase 13-audit-gap-closure]: @root-blank snapshot step placed as step 7 in README Section A (between disko provision and repo copy) — correct sequential dependency for rollback service first-boot operation
 
 ### v2.0 Decisions (pre-phase)
 
@@ -204,7 +209,7 @@ None at roadmap creation. Research flags noted above become implementation verif
 
 ## Session Continuity
 
-Last session: 2026-03-12T18:46:45.010Z
-Stopped at: Completed 13-04-PLAN.md
+Last session: 2026-03-12T18:47:16.810Z
+Stopped at: Completed 13-audit-gap-closure 13-02-PLAN.md
 Resume file: None
 Next action: /gsd:plan-phase 9
