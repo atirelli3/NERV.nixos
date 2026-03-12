@@ -79,33 +79,37 @@ sudo nix --experimental-features "nix-command flakes" \
   run github:nix-community/disko/v1.13.0 -- \
   --mode destroy,format,mount --flake /tmp/nixos#host
 
-# 7. Copy the configured repo to the target filesystem.
+# 7. Create the BTRFS rollback baseline — must be done before nixos-install.
+# Required: @root-blank is the clean-root template — initrd deletes @ and restores from this on every boot.
+btrfs subvolume snapshot -r /mnt/@ /mnt/@root-blank
+
+# 8. Copy the configured repo to the target filesystem.
 sudo mkdir -p /mnt/etc
 sudo cp -r /tmp/nixos /mnt/etc/nixos
 
-# 8. Generate hardware configuration.
+# 9. Generate hardware configuration.
 sudo nixos-generate-config --no-filesystems --show-hardware-config \
   | sudo tee /mnt/etc/nixos/hosts/hardware-configuration.nix
 
-# 9. If Secure Boot was enabled in step 4 — create and place sbctl keys.
+# 10. If Secure Boot was enabled in step 4 — create and place sbctl keys.
 nix-shell -p sbctl --run "sudo sbctl create-keys"
 sudo mkdir -p /mnt/var/lib/sbctl /mnt/persist/var/lib/sbctl
 sudo cp -r /var/lib/sbctl/. /mnt/var/lib/sbctl/
 sudo cp -r /var/lib/sbctl/. /mnt/persist/var/lib/sbctl/
 
-# 10. Stage files and install.
+# 11. Stage files and install.
 sudo git -C /mnt/etc/nixos add -A
 sudo nixos-install --flake /mnt/etc/nixos#host
 
-# 11. Set your user password (nixos-install only prompts for root).
+# 12. Set your user password (nixos-install only prompts for root).
 sudo nixos-enter --root /mnt
 passwd <username>
 exit
 
-# 12. Copy config to /persist so it survives the first BTRFS rollback.
+# 13. Copy config to /persist so it survives the first BTRFS rollback.
 sudo cp -rT /mnt/etc/nixos /mnt/persist/etc/nixos
 
-# 13. Reboot. If Secure Boot is enabled, enter UEFI Setup Mode first (clear SB keys).
+# 14. Reboot. If Secure Boot is enabled, enter UEFI Setup Mode first (clear SB keys).
 sudo reboot
 ```
 
