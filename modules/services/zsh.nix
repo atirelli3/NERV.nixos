@@ -158,5 +158,37 @@ in {
     };
 
     environment.systemPackages = with pkgs; [ eza fzf ];
+
+    # Starship prompt — auto-enabled with nerv.zsh; no separate toggle needed.
+    # interactiveOnly defaults to true — leave unset; the NixOS module places
+    # starship init in promptInit (after interactiveShellInit), so ZLE bindings
+    # from zsh-history-substring-search are established before starship loads.
+    programs.starship = {
+      enable = true;
+      settings = {
+        add_newline = true;
+
+        # Only username and character are active. Every other module is excluded
+        # by naming only these two in the top-level format string — future
+        # nixpkgs default module additions cannot bleed into the prompt.
+        format = "$username\n$character";
+
+        username = {
+          style_user  = "cyan dimmed";
+          style_root  = "red bold";       # immediate visual warning for root
+          format      = "[$user]($style)"; # no trailing " in " suffix
+          show_always = true;              # show outside SSH sessions too
+          disabled    = false;
+        };
+
+        character = {
+          # \$ is the escaped literal dollar sign in Starship format strings.
+          # Nix double-bracket strings pass the backslash through to TOML as-is.
+          success_symbol = ''[\$](white)'';
+          error_symbol   = ''[\$](bold red)'';
+          disabled       = false;
+        };
+      };
+    };
   };
 }
