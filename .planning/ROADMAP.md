@@ -49,7 +49,7 @@ Full archive: `.planning/milestones/v2.0-ROADMAP.md`
 **Plans**: 1 plan
 
 Plans:
-- [ ] 14-01-PLAN.md — Extend disko.nix with zram options, wired zramSwap config, and LVM assertion
+- [x] 14-01-PLAN.md — Extend disko.nix with zram options, wired zramSwap config, and LVM assertion
 
 ### Phase 15: Starship Prompt Integration
 **Goal**: Any host with `nerv.zsh.enable = true` gets a minimal, impermanence-safe two-line shell prompt with no configuration required
@@ -63,7 +63,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 15-01-PLAN.md — Append programs.starship to zsh.nix and verify prompt, ZLE bindings, impermanence safety
+- [x] 15-01-PLAN.md — Append programs.starship to zsh.nix and verify prompt, ZLE bindings, impermanence safety
 
 ## Progress
 
@@ -82,8 +82,8 @@ Plans:
 | 11. Impermanence BTRFS Mode | 1/1 | ✅ Complete | 2026-03-10 |
 | 12. Profile Wiring and Documentation | 3/3 | ✅ Complete | 2026-03-10 |
 | 13. Audit Gap Closure | 4/4 | ✅ Complete | 2026-03-12 |
-| 14. zram Swap Module | 1/1 | Complete    | 2026-03-12 |
-| 15. Starship Prompt Integration | 1/1 | Complete   | 2026-03-12 |
+| 14. zram Swap Module | 1/1 | ✅ Complete | 2026-03-12 |
+| 15. Starship Prompt Integration | 1/1 | ✅ Complete | 2026-03-12 |
 
 ---
 *v2.0 shipped 2026-03-12 · v3.0 roadmap created 2026-03-12*

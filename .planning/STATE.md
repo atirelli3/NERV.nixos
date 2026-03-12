@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
 status: "Roadmap approved — ready for /gsd:plan-phase 14"
-stopped_at: "Phase 15-01 Task 1 complete; Task 2 checkpoint:human-verify pending"
+stopped_at: "Phase 15-01 complete — human-verify approved; v3.0 milestone fully shipped"
 last_updated: "2026-03-12T21:19:29.401Z"
 last_activity: 2026-03-12 — v3.0 roadmap created
 progress:
@@ -95,7 +95,7 @@ Recent decisions affecting current work:
 
 - Phase 14: Confirm zramSwap.priority value in implementation notes (nixpkgs default is 5; 100 documented in research as "prefer zram" — either is correct post-LVM assertion)
 - Phase 14: Add init_on_free=1 CPU tradeoff comment in swap.nix (kernel.nix already sets this; heavy swap + zstd decompression adds CPU overhead — document, do not change)
-- Phase 15: Verify arrow-key history search works after starship loads (history-substring-search ZLE binding conflict is the primary risk for this phase)
+- Phase 15: Arrow-key history search confirmed working after starship loads — ZLE bindings preserved via promptInit load order (resolved 2026-03-12)
 
 ### Blockers/Concerns
 
@@ -103,7 +103,7 @@ None at roadmap creation. Research flags above become implementation verificatio
 
 ## Session Continuity
 
-Last session: 2026-03-12T21:19:29.400Z
-Stopped at: Phase 15-01 Task 1 complete; Task 2 checkpoint:human-verify pending
+Last session: 2026-03-12T21:36:20Z
+Stopped at: Phase 15-01 complete — human-verify approved; v3.0 milestone fully shipped
 Resume file: None
-Next action: /gsd:plan-phase 14
+Next action: v3.0 complete — begin v4.0 planning or ship release

@@ -54,7 +54,7 @@ completed: 2026-03-12
 - **Duration:** ~5 min
 - **Started:** 2026-03-12T21:17:29Z
 - **Completed:** 2026-03-12T21:22:00Z
-- **Tasks:** 1 of 2 complete (Task 2 is human-verify checkpoint)
+- **Tasks:** 2 of 2 complete
 - **Files modified:** 1
 
 ## Accomplishments
@@ -69,7 +69,7 @@ completed: 2026-03-12
 Each task was committed atomically:
 
 1. **Task 1: Append programs.starship block to zsh.nix** - `1339b22` (feat)
-2. **Task 2: Verify starship prompt, ZLE bindings, and impermanence safety** - pending human verification
+2. **Task 2: Verify starship prompt, ZLE bindings, and impermanence safety** - human-verify checkpoint approved
 
 ## Files Created/Modified
 - `modules/services/zsh.nix` - Added programs.starship block (32 lines) after environment.systemPackages inside lib.mkIf cfg.enable
@@ -92,12 +92,13 @@ Note: `nix-instantiate --parse` verification was attempted but Nix tooling is no
 None — no external service configuration required.
 
 ## Next Phase Readiness
-- Task 2 (human-verify checkpoint) requires deploying the flake to a NixOS host and verifying:
-  1. Two-line prompt appears correctly (username dim cyan, $ white)
-  2. Failing command turns $ red
-  3. Arrow-key history search still works (ZLE not clobbered)
-  4. `echo $STARSHIP_CONFIG` resolves to a /nix/store/...-starship.toml path
-  5. `sudo -i` shows username in red bold
+- All tasks complete. Human-verify checkpoint approved with all checks passing:
+  1. Two-line prompt appears correctly (username dim cyan, $ white) — confirmed
+  2. Failing command turns $ red (bold red on non-zero exit) — confirmed
+  3. Arrow-key history search works after starship loads (ZLE not clobbered) — confirmed
+  4. `echo $STARSHIP_CONFIG` resolves to a /nix/store/...-starship.toml path — confirmed
+  5. `sudo -i` shows username in red bold — confirmed
+- v3.0 milestone fully complete: Phase 14 (zram) and Phase 15 (starship) both shipped
 
 ## Self-Check: PASSED
 
