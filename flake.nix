@@ -93,6 +93,20 @@
           ./hosts/configuration.nix
         ];
       };
+
+      # Headless server — SSH only, LVM layout, full tmpfs impermanence.
+      server = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          lanzaboote.nixosModules.lanzaboote
+          home-manager.nixosModules.home-manager
+          impermanence.nixosModules.impermanence
+          disko.nixosModules.disko
+          self.nixosModules.default
+          server
+          ./hosts/configuration.nix
+        ];
+      };
     };
   };
 }
